@@ -7,6 +7,8 @@ name = "KompasAPI-stubs-generator"
 version = "0.0.1"
 dependencies = [
   "pywin32",
+  "bs4",
+  "lxml"
 ]
 requires-python = ">=3.11"
 authors = [
