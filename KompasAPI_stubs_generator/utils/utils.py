@@ -1,3 +1,7 @@
+
+from .. import logging_system
+logger = logging_system.get_logger(__name__)
+
 import sys
 import os
 import typing
@@ -135,7 +139,7 @@ def write_python_module(filepath: str, content: str) -> int:
             f"\n" \
             f"{content}\n" \
         )
-    print(f"Python-код записан в '{filepath}' ({size} bytes).")
+    logger.info(f"Python-код записан в '{filepath}' ({size} bytes).")
     return size
 
 

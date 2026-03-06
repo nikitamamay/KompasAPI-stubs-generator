@@ -24,6 +24,9 @@
 
 """
 
+from . import logging_system
+logger = logging_system.get_logger(__name__)
+
 import typing
 
 import traceback
@@ -191,7 +194,7 @@ def parse_class(cls_: type) -> PythonClass:
 
 def parse_module(module: types.ModuleType) -> list[PythonEntry]:
     module_objects = vars(module)
-    print(f"Загружен модуль '{module.__name__}' ({len(module_objects)} объектов) из файла '{module.__file__}'")
+    logger.info(f"Загружен модуль '{module.__name__}' ({len(module_objects)} объектов) из файла '{module.__file__}'")
 
     contents: list[PythonEntry] = []
 
@@ -205,7 +208,7 @@ def parse_module(module: types.ModuleType) -> list[PythonEntry]:
 
         contents.append(parse_general(key, value))
 
-    print(f"Извлечено {len(contents)} корневых объектов PythonEntry из модуля '{module.__file__}'")
+    logger.info(f"Извлечено {len(contents)} корневых объектов PythonEntry из модуля '{module.__file__}'")
     return contents
 
 
@@ -232,7 +235,7 @@ def get_entries(pylib_contents: list[PythonEntry]) -> dict[str, PythonEntry]:
     entries = {}
     for entry in pylib_contents:
         if entry.name == "":
-            print(f"get_entries(): Ошибка: пустое имя у PythonEntry {repr(entry)}", file=sys.stderr)
+            logger.error(f"get_entries(): Ошибка: пустое имя у PythonEntry {repr(entry)}")
             continue
 
         entries[classes.get_py_entry_full_name(entry, None)] = entry
@@ -247,19 +250,19 @@ def get_entries(pylib_contents: list[PythonEntry]) -> dict[str, PythonEntry]:
 
 def write_pylib(pylib_filepath: str, contents: list[PythonEntry]) -> None:
     json_utils.save_json(pylib_filepath, contents)
-    print(f"Сохранено в '{pylib_filepath}'")
+    logger.info(f"Сохранено в '{pylib_filepath}'")
 
 
 def write_pylib_update(pylib_filepath: str, contents: list[PythonEntry]) -> None:
     json_utils.save_json(pylib_filepath, contents)
-    print(f"Сохранено в '{pylib_filepath}'")
+    logger.info(f"Сохранено в '{pylib_filepath}'")
 
 
 def load_pylib(pylib_filepath: str) -> list[PythonEntry]:
     l = json_utils.load_json_with_classes(pylib_filepath, [
         PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty,
     ])
-    print(f"Загружено {len(l)} объектов PythonEntry из файла '{pylib_filepath}'")
+    logger.info(f"Загружено {len(l)} объектов PythonEntry из файла '{pylib_filepath}'")
     return l
 
 
@@ -268,11 +271,13 @@ def main(
         do_k7: bool = True,
         ) -> None:
     if do_k5:
-        contents = parse_module(kompas_api_modules.Kompas6API5)
+        Kompas6API5 = kompas_api_modules.get_Kompas6API5()
+        contents = parse_module(Kompas6API5)
         write_pylib(const.pylib_K6API5_filepath_raw, contents)
 
     if do_k7:
-        contents = parse_module(kompas_api_modules.KompasAPI7)
+        KompasAPI7 = kompas_api_modules.get_KompasAPI7()
+        contents = parse_module(KompasAPI7)
         write_pylib(const.pylib_KAPI7_filepath_raw, contents)
 
 
@@ -297,24 +302,25 @@ if __name__ == "__main__":
     # _my_repr(_test_function.__code__)
 
 
-    if len(sys.argv) < 2:
-        print(f"""\
-Usage:
-    {sys.argv[0]} what_to_do
+#     if len(sys.argv) < 2:
+#         print(f"""\
+# Usage:
+#     {sys.argv[0]} what_to_do
 
-what_to_do:
-    1 - KompasAPI 5
-    2 - KompasAPI 7
-    3 - both
-""")
-        sys.exit(1)
+# what_to_do:
+#     1 - KompasAPI 5
+#     2 - KompasAPI 7
+#     3 - both
+# """)
+#         sys.exit(1)
 
-    what_to_do = int(sys.argv[1])
-    do_k5 = bool(what_to_do & 0b0001)
-    do_k7 = bool(what_to_do & 0b0010)
+#     what_to_do = int(sys.argv[1])
+#     do_k5 = bool(what_to_do & 0b0001)
+#     do_k7 = bool(what_to_do & 0b0010)
 
-    ### main
+#     ### main
 
-    main(do_k5, do_k7)
+#     main(do_k5, do_k7)
 
+    main()
 

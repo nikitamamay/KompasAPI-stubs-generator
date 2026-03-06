@@ -4,6 +4,11 @@
 по js-файлам.
 
 """
+
+from . import logging_system
+logger = logging_system.get_logger(__name__)
+
+
 import typing
 
 import traceback
@@ -290,7 +295,7 @@ def parse_description_section(
             section_output += string
 
         else:
-            print(f"parse_description_section(): Предупреждение: неизвестный тег: '{tag.name}' у {topic}", file=sys.stderr)
+            logger.warning(f"parse_description_section(): Предупреждение: неизвестный тег: '{tag.name}' у {topic}")
 
     if section_output != "":
         # оборачивание кода раздела "Синтаксис" в кавычки-апострофы
@@ -357,7 +362,7 @@ def parse_description_section(
                 obtained_return_type = "|".join(obtained_types)
 
             if obtained_return_type != "":
-                print(f"\t_try_to_update_value_types(): найденный тип данных = '{obtained_return_type}' у '{topic.own_href}'")
+                logger.debug(f"\t_try_to_update_value_types(): найденный тип данных = '{obtained_return_type}' у '{topic.own_href}'")
                 if description_data.return_type != "":
                     description_data.return_type += "|" + obtained_return_type
                 else:
@@ -390,7 +395,7 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
             ns: NavigableString|str = tag
             ns = ns.strip()
             if ns != "":
-                print(f"parse_description(): Ошибка: контент вне тега body: {repr(ns)} у '{topic}'", file=sys.stderr)
+                logger.error(f"parse_description(): Ошибка: контент вне тега body: {repr(ns)} у '{topic}'")
             continue
 
         if tag.name == "p":
@@ -484,24 +489,24 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
                         # поэтому, чтобы не править много страниц, пусть эти все жирные тексты будут просто
                         # помещены по-умолчанию в раздел общего описания и всё, пусть и с предупреждением.
                         #
-                        print(f"parse_description(): Предупреждение: помещен в раздел общего описания текст с жирным текстом '{tag_text}' у {topic}", file=sys.stderr)
+                        logger.debug(f"parse_description(): Предупреждение: помещен в раздел общего описания текст с жирным текстом '{tag_text}' у {topic}")
                         current_section = DescriptionSection.PlainDescription
                         # continue здесь не надо. Подразумевается, что это не заголовок, а часть раздела общего описания
 
         elif tag.name == "div":
             child: Tag|None = tag.find(lambda tagname: True)
             if child is None:
-                print(f"parse_description(): Предупреждение: Пустой div у {topic}", file=sys.stderr)
+                logger.warning(f"parse_description(): Предупреждение: Пустой div у {topic}")
                 continue
 
             if child.name != "table":
-                print(f"parse_description(): Предупреждение: Не найдена таблица внутри div: {tag} у {topic}", file=sys.stderr)
+                logger.warning(f"parse_description(): Предупреждение: Не найдена таблица внутри div: {tag} у {topic}")
                 continue
 
             tag = child
 
         else:
-            print(f"parse_description(): Ошибка: неизвестный тег: '{tag.name}' у {topic}", file=sys.stderr)
+            logger.error(f"parse_description(): Ошибка: неизвестный тег: '{tag.name}' у {topic}")
             # tag_text = pretty_text(tag.get_text().replace("\n", " "))
             # continue
 
@@ -561,7 +566,7 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
         for table_tag in body_tag.find_all("table")
     ]  # FIXME разрешается ли несколько таблиц?
     if len(table_tags) != 1:
-        print(f"parse_description_for_enum(): Ошибка: Неверное количество таблиц ({len(table_tags)} шт.) у {topic}", file=sys.stderr)
+        logger.error(f"parse_description_for_enum(): Ошибка: Неверное количество таблиц ({len(table_tags)} шт.) у {topic}")
         return False
 
     table_tag: Tag = table_tags[0]
@@ -574,7 +579,7 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
             tags_to_remove.append(tr_tag)
 
     if len(tags_to_remove) > 0:
-        print(f"parse_description_for_enum(): Предупреждение: таблица содержит некорректные строки (colspan, rowspan) у {topic}", file=sys.stderr)
+        logger.warning(f"parse_description_for_enum(): Предупреждение: таблица содержит некорректные строки (colspan, rowspan) у {topic}")
         for tag in tags_to_remove:
             tag.extract()
 
@@ -587,7 +592,7 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
     if name_cell_index == -1 or value_cell_index == -1:
         row_tag = table_tag.find("tr")
         if row_tag is None:
-            print(f"parse_description_for_enum(): Ошибка: не найдена строка таблицы у {topic}", file=sys.stderr)
+            logger.error(f"parse_description_for_enum(): Ошибка: не найдена строка таблицы у {topic}")
             return False
 
         td_tags = row_tag.find_all("td")
@@ -597,7 +602,7 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
                 name_cell_index = i
 
         if name_cell_index == -1:
-            print(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}", file=sys.stderr)
+            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}")
             return False
 
         for i, td_tag in enumerate(td_tags):
@@ -606,10 +611,10 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
                 value_cell_index = i
 
         if value_cell_index == -1:
-            print(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}", file=sys.stderr)
+            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}")
             return False
 
-        print(f"parse_description_for_enum(): индексы столбцов у enum: name={name_cell_index}, value={value_cell_index} у {topic}")  # не надо в stderr
+        logger.debug(f"parse_description_for_enum(): индексы столбцов у enum: name={name_cell_index}, value={value_cell_index} у {topic}")  # не надо в stderr
 
     ### парсинг
 
@@ -633,11 +638,11 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
                 other.append(td_text)
 
         if name == "" or value == "":
-            print(f"parse_description_for_enum(): Ошибка: не извлечены имя и/или значение в строке таблицы еnum: name={repr(name)}, value={repr(value)} у {topic}", file=sys.stderr)
+            logger.error(f"parse_description_for_enum(): Ошибка: не извлечены имя и/или значение в строке таблицы еnum: name={repr(name)}, value={repr(value)} у {topic}")
             continue
 
         if not search_identifier(name, True):
-            print(f"parse_description_for_enum(): Ошибка: некорректный идентификатор (enum member name) в строке таблицы: name={repr(name)}, value={repr(value)} у {topic}", file=sys.stderr)
+            logger.error(f"parse_description_for_enum(): Ошибка: некорректный идентификатор (enum member name) в строке таблицы: name={repr(name)}, value={repr(value)} у {topic}")
             continue
 
         member_docstring = "\n\n".join(other)
@@ -684,9 +689,9 @@ def parse_hierarchy(soup: Tag, interface_class_name: str, own_href: str) -> list
             if i > 0:
                 direct_base_classes = [hierarchy_classes[i - 1]]
             else:
-                print(f"parse_hierarchy(): Предупреждение: не найден родитель у '{interface_class_name}'. hierarchy_classes={hierarchy_classes}; в файле '{own_href}'", file=sys.stderr)
+                logger.warning(f"parse_hierarchy(): Предупреждение: не найден родитель у '{interface_class_name}'. hierarchy_classes={hierarchy_classes}; в файле '{own_href}'")
         except ValueError:
-            print(f"parse_hierarchy(): Предупреждение: не найдено собственное имя интерфейса у '{interface_class_name}'. hierarchy_classes={hierarchy_classes}; в файле '{own_href}'", file=sys.stderr)
+            logger.warning(f"parse_hierarchy(): Предупреждение: не найдено собственное имя интерфейса у '{interface_class_name}'. hierarchy_classes={hierarchy_classes}; в файле '{own_href}'")
 
 
     hierarchy = [direct_base_classes, hierarchy_add]
@@ -712,7 +717,7 @@ def parse_single_jstopic(
         jstopic.own_href = own_href
 
     if parser_injections.is_useless_page(jstopic.own_href):
-        print(f"\tизвестно, что эта страница бесполезна.")
+        logger.debug(f"\tизвестно, что эта страница бесполезна.")
         return None
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -723,7 +728,7 @@ def parse_single_jstopic(
     try:
         data = utils.fix_js_object_to_json(data)
     except Exception as e:
-        print(f"parse_single_jstopic(): Ошибка: utils.fix_js_object_to_json() c файлом '{filepath}': {e.__class__.__name__}: {str(e)}", file=sys.stderr)
+        logger.error(f"parse_single_jstopic(): Ошибка: utils.fix_js_object_to_json() c файлом '{filepath}'", exc_info=True)
         return None
 
     ### парсинг JSON
@@ -731,7 +736,7 @@ def parse_single_jstopic(
     try:
         d = json.loads(data, )
     except Exception as e:
-        print(f"parse_single_jstopic(): Ошибка: json.loads() c файлом '{filepath}': {e.__class__.__name__}: {str(e)}", file=sys.stderr)
+        logger.error(f"parse_single_jstopic(): Ошибка: json.loads() c файлом '{filepath}'", exc_info=True)
         return None
 
     jstopic.from_json_base(d)
@@ -775,7 +780,7 @@ def parse_single_jstopic(
             return is_interface_page
 
         def _print_empty_own_name():
-            print(f"parse_single_jstopic(): Ошибка: не извлечено own_name из hmTitle={repr(jstopic.hmTitle)} у {jstopic}", file=sys.stderr)
+            logger.error(f"parse_single_jstopic(): Ошибка: не извлечено own_name из hmTitle={repr(jstopic.hmTitle)} у {jstopic}")
 
         # страница перечня ссылок на свойства, методы, события
         if jstopic.own_href.endswith("_props.js") \
@@ -785,14 +790,14 @@ def parse_single_jstopic(
                 or jstopic.hmTitle.endswith("- свойства") \
                 or jstopic.hmTitle.endswith("- методы"):
             jstopic.page_type = HelpPageType.LinkListPage
-            print(f"parse_single_jstopic(): Предупреждение: страница со ссылками. Пропуск. {jstopic}", file=sys.stderr)
+            logger.debug(f"parse_single_jstopic(): Предупреждение: страница со ссылками. Пропуск. {jstopic}")
             return None
 
         # страница класса интерфейса
         if _is_interface_page():
             jstopic.page_type = HelpPageType.Interface
             if not _parse_description():
-                print(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}", file=sys.stderr)
+                logger.debug(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
                 return None
 
             jstopic.own_name = parser_injections.fix_interface_name(search_identifier(jstopic.hmTitle), jstopic.own_href)
@@ -823,7 +828,7 @@ def parse_single_jstopic(
                 or "- методы" in jstopic.hmBreadCrumbs:
             jstopic.page_type = HelpPageType.PropertyOrMethod
             if not _parse_description():
-                print(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}", file=sys.stderr)
+                logger.debug(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
                 return None
 
             jstopic.own_name = parser_injections.fix_property_or_method_name(search_identifier(jstopic.hmTitle), jstopic.own_href)
@@ -834,32 +839,31 @@ def parse_single_jstopic(
             # не стоит пытаться найти parent_interface_href через hmBreadCrumps: это слишком сложно.
             # Если уж править, то тогда в parser_injections добавлять ссылку на parent_interface_href в fix_body() для определенных страниц.
             if jstopic.parent_interface_href == "":
-                print(f"parse_single_jstopic(): Предупреждение: пустой parent_interface_href у {jstopic}", file=sys.stderr)
+                logger.warning(f"parse_single_jstopic(): Предупреждение: пустой parent_interface_href у {jstopic}")
 
             return jstopic
 
         # # страница события
         # if "- события" in jstopic.hmBreadCrumbs:
-        #     print(f"parse_single_jstopic(): Предупреждение: найдена страница события. Что с этим делать? {jstopic}", file=sys.stderr)
+        #     logger.warning(f"parse_single_jstopic(): Предупреждение: найдена страница события. Что с этим делать? {jstopic}")
         #     pass  # TODO
         #     return jstopic
 
         # если пустая страница
         if not _parse_description():
             jstopic.page_type = HelpPageType.EmptyPage
-            print(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}", file=sys.stderr)
+            logger.warning(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
             return None
 
         # страница чего-то другого
-        print(f"parse_single_jstopic(): Предупреждение: страница неизвестного типа. {jstopic}", file=sys.stderr)
+        logger.warning(f"parse_single_jstopic(): Предупреждение: страница неизвестного типа. {jstopic}")
         return None
 
     except Exception as e:
-        print(f"parse_single_jstopic(): Ошибка: при парсинге html-контента у {jstopic}: {e.__class__.__name__}: {e}", file=sys.stderr)
-        # print(utils.indent_lines(traceback.format_exc()), end="", file=sys.stderr)
+        logger.error(f"parse_single_jstopic(): Ошибка: при парсинге html-контента у {jstopic}", exc_info=True)
 
     if jstopic.own_name == "":
-        print(f"parse_single_jstopic(): Ошибка: попытка возврата jstopic с пустым own_name: {jstopic}", file=sys.stderr)
+        logger.critical(f"parse_single_jstopic(): Ошибка: попытка возврата jstopic с пустым own_name: {jstopic}")
         return None
 
     return jstopic
@@ -873,23 +877,23 @@ def parse_jstopics(
 
     for filepath in filepaths:
         jstopic_href = os.path.split(filepath)[1]
-        print(f"'{jstopic_href}'")
+        logger.debug(f"'{jstopic_href}'")
 
         if jstopic_href in parsed_topics:
-            print(f"\tПарсинг уже выполнен ранее для '{jstopic_href}'. Пропуск.")
+            logger.debug(f"\tПарсинг уже выполнен ранее для '{jstopic_href}'. Пропуск.")
             continue
 
         parsed_topics.add(jstopic_href)
 
         topic = parse_single_jstopic(filepath, own_href=jstopic_href)
-        print(f"\ttopic={topic}")
+        logger.debug(f"\ttopic={topic}")
 
         if topic is None:
             continue
 
         jstopics.append(topic)
 
-    print(f"Извлечено {len(jstopics)} объектов jstopic из {len(filepaths)} ссылок.")
+    logger.info(f"Извлечено {len(jstopics)} объектов jstopic из {len(filepaths)} ссылок.")
     return jstopics
 
 
@@ -921,7 +925,7 @@ def _merge_enum_members(members_to_stay: list[list[str]], members_to_remove: lis
         else: # если удаляемый member есть в списке остающихся members
             s_name, s_value, s_docstring = s_member
             if r_value != s_value:
-                print(f"merge_enum_members(): Ошибка: для имен '{s_name}' разные значения: {repr(s_value)}, {repr(r_value)}", file=sys.stderr)
+                logger.error(f"merge_enum_members(): Ошибка: для имен '{s_name}' разные значения: {repr(s_value)}, {repr(r_value)}")
                 continue
 
             # r_member[2] = r_docstring if len(r_docstring) > len(s_docstring) else s_docstring
@@ -933,7 +937,7 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
     Метод должен вызываться после того, как выполнен парсинг для всех страниц
     Справки: `Kompas6API5`, `KompasAPI7`, `constants`.
     """
-    print(f"Исправление объектов jstopic после окончательного парсинга...")
+    logger.info(f"Исправление объектов jstopic после окончательного парсинга...")
 
     ### проверка на уникальность наименований
     # нельзя использовать `classes.filter_by_type()`, потому что она возвращает словарь, и там классы одного типа затираются
@@ -943,7 +947,7 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
     for name, topics_list in names_and_topics.items():
         if len(topics_list) > 1:
             for topic in topics_list:
-                print(f"fix_jstopics_after_parsing(): Ошибка: объект jstopic с повторяющимся именем '{name}': {topic}", file=sys.stderr)
+                logger.error(f"fix_jstopics_after_parsing(): Ошибка: объект jstopic с повторяющимся именем '{name}': {topic}")
 
     ### назначение родительских интерфейсов для страниц свойства/метода
 
@@ -953,12 +957,12 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
     for topic in jstopics:
         if topic.page_type == HelpPageType.PropertyOrMethod:
             if topic.parent_interface_href == "":
-                print(f"fix_jstopics_after_parsing(): Ошибка: нет ссылки на родительский интерфейс у {topic}", file=sys.stderr)
+                logger.error(f"fix_jstopics_after_parsing(): Ошибка: нет ссылки на родительский интерфейс у {topic}")
                 continue
 
             parent_topic = classes.find_jstopic_by_href(topic.parent_interface_href, interfaces)
             if parent_topic is None:
-                print(f"fix_jstopics_after_parsing(): Ошибка: не найден родительский интерфейс по ссылке '{topic.parent_interface_href}' для {topic}", file=sys.stderr)
+                logger.error(f"fix_jstopics_after_parsing(): Ошибка: не найден родительский интерфейс по ссылке '{topic.parent_interface_href}' для {topic}")
                 continue
 
             topic.parent_interface_name = parent_topic.own_name
@@ -973,7 +977,7 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
                 continue
 
             if not all(topics_types):
-                print(f"fix_jstopics_after_parsing(): Ошибка: объекты jstopic имеют разные типы, но одинаковые имена {repr(name)}: {topics_list}", file=sys.stderr)
+                logger.error(f"fix_jstopics_after_parsing(): Ошибка: объекты jstopic имеют разные типы, но одинаковые имена {repr(name)}: {topics_list}")
                 continue
 
             topic = topics_list[0]  # остающийся объект. Остальные - к удалению.
@@ -984,24 +988,24 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
                 _merge_enum_members(topic.enum_members, t.enum_members)
 
                 jstopics.remove(t)
-                print(f"fix_jstopics_after_parsing(): Предупреждение: удален объект jstopic вследствие слияния enums с одинаковым именем {repr(name)}: {t}", file=sys.stderr)
+                logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: удален объект jstopic вследствие слияния enums с одинаковым именем {repr(name)}: {t}")
 
 
     ### вывод объектов, у которых page_type == Unknown
 
     for topic in jstopics:
         if topic.page_type == HelpPageType.Unknown:
-            print(f"fix_jstopics_after_parsing(): Предупреждение: остается объект jstopic с неизвестным типом страницы: {topic}", file=sys.stderr)
+            logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: остается объект jstopic с неизвестным типом страницы: {topic}")
 
-    print(f"Исправлены {fixed_count} объектов jstopic.")
+    logger.info(f"Исправлены {fixed_count} объектов jstopic.")
 
 
 def load_topics(filepath: str) -> list[Topic]:
     if not os.path.exists(filepath):
-        print(f"load_topics(): Ошибка: файла не существует: '{filepath}'", file=sys.stderr)
+        logger.error(f"load_topics(): Ошибка: файла не существует: '{filepath}'")
         return []
     l = json_utils.load_json_with_classes(filepath, [Topic])
-    print(f"Загружено {len(l)} объектов jstopic (страниц справки) из файла '{filepath}'.")
+    logger.info(f"Загружено {len(l)} объектов jstopic (страниц справки) из файла '{filepath}'.")
     return l
 
 
@@ -1067,32 +1071,34 @@ def main(
     fix_jstopics_after_parsing(jstopics)
 
     json_utils.save_json(const.topics_filepath, jstopics)
-    print(f"Записано {len(jstopics)} объектов Topic в файл '{const.topics_filepath}'")
+    logger.info(f"Записано {len(jstopics)} объектов Topic в файл '{const.topics_filepath}'")
 
 
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 3:
-        print(f"""\
-Usage:
-    {sys.argv[0]} what_to_do help_sdk_base_dir
+#     if len(sys.argv) < 3:
+#         print(f"""\
+# Usage:
+#     {sys.argv[0]} what_to_do help_sdk_base_dir
 
-what_to_do:
-    1 - KompasAPI 5
-    2 - KompasAPI 7
-    4 - KompasAPI constants
-    7 - all of the above
-""")
-        sys.exit(1)
+# what_to_do:
+#     1 - KompasAPI 5
+#     2 - KompasAPI 7
+#     4 - KompasAPI constants
+#     7 - all of the above
+# """)
+#         sys.exit(1)
 
-    what_to_do = int(sys.argv[1])
-    sdk_base_dir = sys.argv[2]
+#     what_to_do = int(sys.argv[1])
+#     sdk_base_dir = sys.argv[2]
 
-    do_k5 = bool(what_to_do & 0b0001)
-    do_k7 = bool(what_to_do & 0b0010)
-    do_const = bool(what_to_do & 0b0100)
+#     do_k5 = bool(what_to_do & 0b0001)
+#     do_k7 = bool(what_to_do & 0b0010)
+#     do_const = bool(what_to_do & 0b0100)
 
-    ### main
+#     ### main
 
-    main(sdk_base_dir, do_k5, do_k7, do_const)
+#     main(sdk_base_dir, do_k5, do_k7, do_const)
+
+    pass

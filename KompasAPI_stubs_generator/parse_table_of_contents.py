@@ -5,6 +5,8 @@
 
 """
 
+from . import logging_system
+logger = logging_system.get_logger(__name__)
 
 import typing
 
@@ -51,8 +53,8 @@ def read_toc_json(hmcontent_js_filepath: str) -> list[dict]:
     try:
         data = utils.fix_js_object_to_json(data)
     except Exception as e:
-        print(f"read_toc_json(): Ошибка: в fix_js_object_to_json(): {e.__class__.__name__}: {e}", file=sys.stderr)
-        # print(utils.indent_lines(traceback.format_exc()), end="", file=sys.stderr)
+        logger.error(f"read_toc_json(): Ошибка: в fix_js_object_to_json()", exc_info=True)
+        # logger.error(utils.indent_lines(traceback.format_exc()), end="")
         return []
 
     ### парсинг JSON
@@ -60,13 +62,13 @@ def read_toc_json(hmcontent_js_filepath: str) -> list[dict]:
     try:
         d = json.loads(data, )
     except Exception as e:
-        print(f"read_toc_json(): Ошибка: в json.loads(): {e.__class__.__name__}: {e}", file=sys.stderr)
-        # print(utils.indent_lines(traceback.format_exc()), end="", file=sys.stderr)
+        logger.error(f"read_toc_json(): Ошибка: в json.loads()", exc_info=True)
+        # logger.error(utils.indent_lines(traceback.format_exc()), end="")
         return []
 
     items = d["items"]
-    print(f"Извлечены записи оглавления из '{hmcontent_js_filepath}'.")
-    print(f"На корневом уровне {len(items)} записей.")
+    logger.info(f"Извлечены записи оглавления из '{hmcontent_js_filepath}'.")
+    logger.info(f"На корневом уровне {len(items)} записей.")
     return items
 
 
@@ -77,12 +79,12 @@ def parse_toc_entry(
     toc_entry = TOCEntry()
     toc_entry.title = d["cp"].strip()
     toc_entry.href = d["hf"].strip()
-    print(f"{'  '*debug_print_indent_level}'{toc_entry.title}' ('{toc_entry.href}')")
+    logger.debug(f"{'  '*debug_print_indent_level}'{toc_entry.title}' ('{toc_entry.href}')")
     for child_d in d["items"]:
         if isinstance(child_d, dict):
             toc_entry.children.append(parse_toc_entry(child_d, debug_print_indent_level + 1))
         else:
-            print(f"parse_toc_entry(): Ошибка: ожидается словарь: {repr(child_d)}", file=sys.stderr)
+            logger.debug(f"parse_toc_entry(): Ошибка: ожидается словарь: {repr(child_d)}")
     return toc_entry
 
 
@@ -92,29 +94,29 @@ def main(
     help_hmcontent_js_filepath: str = const.get_hmcontent_js_filepath(sdk_base_dir)
     toc_filepath: str = const.toc_filepath
 
-    print(f"Чтение JS/JSON из файла '{help_hmcontent_js_filepath}'...")
+    logger.info(f"Чтение JS/JSON из файла '{help_hmcontent_js_filepath}'...")
 
     toc_items_json: list[dict] = read_toc_json(help_hmcontent_js_filepath)
 
-    print(f"Создание объектов класса TOC_Entry...")
+    logger.info(f"Создание объектов класса TOC_Entry...")
 
     items: list[TOCEntry] = []
 
     for toc_dict in toc_items_json:
         items.append(parse_toc_entry(toc_dict))
 
-    print(f"Сохранение объектов в '{toc_filepath}'...")
+    logger.info(f"Сохранение объектов в '{toc_filepath}'...")
 
     json_utils.save_json(toc_filepath, items)
 
-    print(f"Сохранено в '{toc_filepath}'.")
+    logger.info(f"Сохранено в '{toc_filepath}'.")
 
 
 def load_root_toc_entries(
         toc_filepath: str = const.toc_filepath,
         ) -> list[TOCEntry]:
     toc_entries: list[TOCEntry] = json_utils.load_json_with_classes(toc_filepath, [TOCEntry])
-    print(f"Загружено оглавление из '{toc_filepath}'. Корневых записей: {len(toc_entries)}.")
+    logger.info(f"Загружено оглавление из '{toc_filepath}'. Корневых записей: {len(toc_entries)}.")
     return toc_entries
 
 
@@ -168,14 +170,15 @@ def get_toc_entries_list(
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print(f"""\
-Usage:
-    {sys.argv[0]} help_sdk_base_dir
-""")
-        sys.exit(1)
+#     if len(sys.argv) < 2:
+#         print(f"""\
+# Usage:
+#     {sys.argv[0]} help_sdk_base_dir
+# """)
+#         sys.exit(1)
 
-    sdk_base_dir = sys.argv[1]
+#     sdk_base_dir = sys.argv[1]
 
-    main(sdk_base_dir)
+#     main(sdk_base_dir)
 
+    pass

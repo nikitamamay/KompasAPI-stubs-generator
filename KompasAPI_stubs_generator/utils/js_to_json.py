@@ -6,6 +6,9 @@
 """
 
 
+from .. import logging_system
+logger = logging_system.get_logger(__name__)
+
 
 import typing
 
@@ -125,7 +128,7 @@ def js_to_json_string(data: str, starting_quote_i: int) -> tuple[str, int]:
 
     else:
         raise Exception(f"Syntax error on i={i}: reached EOF when searching for string ending quote {repr(quote_symbol)}")
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_string(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_string(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -191,7 +194,7 @@ def js_to_json_dict(
     else:
         raise Exception(f"Syntax error on i={i}: reached EOF when searching for dict entries")
 
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_dict(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_dict(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -234,7 +237,7 @@ def js_to_json_list(
     else:
         raise Exception(f"Syntax error on i={i}: reached EOF when searching for list entries")
 
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_list(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_list(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -256,7 +259,7 @@ def js_to_json_identifier(data: str, i_start: int) -> tuple[str, int]:
         else:
             break
         i += 1
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_identifier(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_identifier(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -281,7 +284,7 @@ def js_to_json_number(data: str, i_start: int) -> tuple[str, int]:
         else:
             break
         i += 1
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_identifier(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_identifier(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -301,7 +304,7 @@ def js_to_json_parenthesis(data: str, i_start: int) -> tuple[str, int]:
     if ending_keyword == "":
         raise Exception(f"Syntax error on i={i}: reached EOF when searching for parenthesis contents")
 
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_parenthesis(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_parenthesis(): i={i}, output={repr(output)}")
     return (output, i)
 
 
@@ -388,7 +391,7 @@ def js_to_json_general(data: str, i_start: int, ending_keywords: list[str]) -> t
 
         # i += 1
 
-    if JS_TO_JSON_DEBUG: print(f"js_to_json_general(): i={i}, output={repr(output)}")
+    if JS_TO_JSON_DEBUG: logger.debug(f"js_to_json_general(): i={i}, output={repr(output)}")
     return (output, general_data_type, ending_keyword, i)
 
 
@@ -411,7 +414,7 @@ if __name__ == "__main__":
     def _find_js_object(data: str) -> str:
         """
         Главная идея - найти самые большие фигурные скобки `{ }`
-        (предполагается, что они в файлу одни единственные)
+        (предполагается, что они в файле одни единственные)
         и вернуть их содержимое **вместе** с фигурными скобками.
         """
         i_start = data.find("{")

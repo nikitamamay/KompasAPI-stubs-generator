@@ -3,6 +3,10 @@
 
 """
 
+
+from . import logging_system
+logger = logging_system.get_logger(__name__)
+
 import sys
 
 from bs4 import BeautifulSoup, Tag, Comment
@@ -187,7 +191,7 @@ def fix_interface_name(text: str, own_href: str = "") -> str:
             return text[:i]
 
     if not text.isidentifier() or not text.isascii():
-        print(f"fix_interface_name(): Предупреждение: сомнительное имя интерфейса: {repr(text)} у файла '{own_href}'", file=sys.stderr)
+        logger.warning(f"fix_interface_name(): Предупреждение: сомнительное имя интерфейса: {repr(text)} у файла '{own_href}'")
     return text
 
 
@@ -236,7 +240,7 @@ def fix_property_or_method_name(text: str, own_href: str) -> str:
     #     return "Clear"
 
     if not text.isidentifier() or not text.isascii():
-        print(f"fix_property_or_method_name(): Предупреждение: сомнительное имя свойства/метода: {repr(text)} у файла '{own_href}'", file=sys.stderr)
+        logger.warning(f"fix_property_or_method_name(): Предупреждение: сомнительное имя свойства/метода: {repr(text)} у файла '{own_href}'")
     return text
 
 
@@ -250,7 +254,7 @@ def fix_enum_name(text: str, own_href: str) -> str:
         return text
 
     if not text.isidentifier() or not text.isascii():
-        print(f"fix_enum_name(): Предупреждение: сомнительное имя enum: {repr(text)} у файла '{own_href}'", file=sys.stderr)
+        logger.warning(f"fix_enum_name(): Предупреждение: сомнительное имя enum: {repr(text)} у файла '{own_href}'")
     return text
 
 
@@ -283,7 +287,7 @@ def fix_function_return_type(own_href: str) -> str|None:
 
 
     # if not text.isidentifier() or not text.isascii():
-    #     print(f"fix_function_return_type(): Предупреждение: сомнительное имя типа возврата: {repr(text)} у файла '{own_href}'", file=sys.stderr)
+    #     logger.warning(f"fix_function_return_type(): Предупреждение: сомнительное имя типа возврата: {repr(text)} у файла '{own_href}'")
     return None
 
 

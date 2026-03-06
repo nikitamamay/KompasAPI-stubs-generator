@@ -1,4 +1,6 @@
 
+from . import logging_system
+logger = logging_system.get_logger(__name__)
 
 import typing
 
@@ -38,7 +40,7 @@ def generate_pyi_general(py_entry: PythonEntry) -> str:
         output += generate_pyi_simple_value(py_entry) + "\n"
 
     else:
-        print(f"generate_pyi_general(): Ошибка: неподдерживаемый тип ({type(py_entry)}): {repr(py_entry)}")
+        logger.error(f"generate_pyi_general(): Ошибка: неподдерживаемый тип ({type(py_entry)}): {repr(py_entry)}")
         output += generate_pyi_unknown_entry(py_entry) + "\n"
 
     return output
@@ -188,22 +190,23 @@ def main(
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print(f"""\
-Usage:
-    {sys.argv[0]} what_to_do
+#     if len(sys.argv) < 2:
+#         print(f"""\
+# Usage:
+#     {sys.argv[0]} what_to_do
 
-what_to_do:
-    1 - KompasAPI 5
-    2 - KompasAPI 7
-    3 - both
-""")
-        sys.exit(1)
+# what_to_do:
+#     1 - KompasAPI 5
+#     2 - KompasAPI 7
+#     3 - both
+# """)
+#         sys.exit(1)
 
-    what_to_do = int(sys.argv[1])
-    do_k5 = bool(what_to_do & 0b0001)
-    do_k7 = bool(what_to_do & 0b0010)
+#     what_to_do = int(sys.argv[1])
+#     do_k5 = bool(what_to_do & 0b0001)
+#     do_k7 = bool(what_to_do & 0b0010)
 
     ### main
 
-    main(do_k5, do_k7)
+    # main(do_k5, do_k7)
+    main()

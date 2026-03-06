@@ -6,6 +6,8 @@
 в значениях (`list[str]`) - их прямые классы-родители.
 """
 
+from . import logging_system
+logger = logging_system.get_logger(__name__)
 
 import typing
 
@@ -35,18 +37,18 @@ def generate_hierarchy(interfaces: typing.Iterable[Topic]) -> dict[str, list[str
     KompasAPIclassesHierarchy: dict[str, list[str]] = {
         CLASS_NAME_IDispatch: [],
     }
-    print(f"Генерация иерархии (перечня прямых родителей)...")
+    logger.info(f"Генерация иерархии (перечня прямых родителей)...")
 
     for topic in interfaces:
         cn: str = topic.own_name
-        print(f"{cn}")
+        logger.debug(f"{cn}")
 
         if cn == "":
-            print(f"generate_hierarchy(): Ошибка: Пустое own_name у {topic}", file=sys.stderr)
+            logger.error(f"generate_hierarchy(): Ошибка: Пустое own_name у {topic}")
             continue
 
         if cn in KompasAPIclassesHierarchy:
-            print(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy, для '{cn}'", file=sys.stderr)
+            logger.warning(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy, для '{cn}'")
             continue
 
         # assert len(topic.hierarchy) > 1, f"Ошибка: Пустая иерархия у {topic}: {repr(topic.hierarchy)}"
@@ -54,7 +56,7 @@ def generate_hierarchy(interfaces: typing.Iterable[Topic]) -> dict[str, list[str
 
         KompasAPIclassesHierarchy[cn] = base_classes.copy()
 
-    print(f"Сформирована иерархия (перечень прямых родителей) для {len(KompasAPIclassesHierarchy)} классов.")
+    logger.info(f"Сформирована иерархия (перечень прямых родителей) для {len(KompasAPIclassesHierarchy)} классов.")
     return KompasAPIclassesHierarchy
 
 
@@ -71,7 +73,7 @@ def write_hierarchy(filepath: str, KompasAPIclassesHierarchy: dict[str, list[str
 
     size = utils.write_python_module(filepath, content)
 
-    print(f"Иерархия классов записана в '{filepath}' ({size} bytes).")
+    logger.info(f"Иерархия классов записана в '{filepath}' ({size} bytes).")
 
 
 def generate_and_write_hierarchy(
@@ -80,7 +82,7 @@ def generate_and_write_hierarchy(
         ) -> None:
 
     interfaces: list[Topic] = list(classes.filter_by_type(jstopics, HelpPageType.Interface).values())
-    print(f"Загружено {len(interfaces)} классов интерфейсов.")
+    logger.info(f"Загружено {len(interfaces)} классов интерфейсов.")
 
     KompasAPIclassesHierarchy = generate_hierarchy(interfaces)
     write_hierarchy(KompasAPIclassesHierarchy_file, KompasAPIclassesHierarchy)
@@ -92,7 +94,7 @@ def load_hierarchy_python(
     KompasAPIclassesHierarchy: dict[str,list[str]] = utils.import_python_module_by_filepath(
         KompasAPIclassesHierarchy_file
         ).KompasAPIclassesHierarchy
-    print(f"Загружена иерархия для {len(KompasAPIclassesHierarchy)} классов КомпасAPI из файла '{KompasAPIclassesHierarchy_file}'.")
+    logger.info(f"Загружена иерархия для {len(KompasAPIclassesHierarchy)} классов КомпасAPI из файла '{KompasAPIclassesHierarchy_file}'.")
     return KompasAPIclassesHierarchy
 
 
@@ -110,9 +112,5 @@ def main(
 
 
 if __name__ == "__main__":
-
-    # raise Exception("Сделать из pylib_*.json, а не из jstopics! Или необязательно?")
-
-    ### main
 
     main()

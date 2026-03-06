@@ -1,6 +1,10 @@
 """
 
 """
+
+from . import logging_system
+logger = logging_system.get_logger(__name__)
+
 import typing
 
 import traceback
@@ -43,7 +47,7 @@ def update_property_or_method(
         pass
 
     else:
-        print(f"update_property_or_method(): Ошибка: неожиданный тип py_entry ({type(py_entry)}) для {topic}", file=sys.stderr)
+        logger.error(f"update_property_or_method(): Ошибка: неожиданный тип py_entry ({type(py_entry)}) для {topic}")
 
 
 def update_class(
@@ -82,14 +86,14 @@ def update_pylibs_from_topics(
     interface_topics = classes.filter_by_type(jstopics, HelpPageType.Interface)
     enum_topics = classes.filter_by_type(jstopics, HelpPageType.Enum)
 
-    print(f"Количество объектов class_entry_topics: {len(class_entry_topics)}")
-    print(f"Количество объектов   interface_topics: {len(interface_topics)}")
-    print(f"Количество объектов        enum_topics: {len(enum_topics)}")
+    logger.info(f"Количество объектов class_entry_topics: {len(class_entry_topics)}")
+    logger.info(f"Количество объектов   interface_topics: {len(interface_topics)}")
+    logger.info(f"Количество объектов        enum_topics: {len(enum_topics)}")
 
 
     ### получение перечней свойств и методов, которые принадлежат родительским классам
 
-    print(f"Получение перечней свойств/методов в родительских классах...")
+    logger.info(f"Получение перечней свойств/методов в родительских классах...")
     classes_children: dict[str, list[str]] = {
         CLASS_NAME_IDispatch: [],
     }
@@ -97,7 +101,7 @@ def update_pylibs_from_topics(
         if isinstance(py_class, PythonClass):
             classes_children[name] = [e.name for e in py_class.children]
 
-    print(f"Получены перечни свойств и методов для {len(classes_children)} классов.")
+    logger.info(f"Получены перечни свойств и методов для {len(classes_children)} классов.")
 
     class_names: set[str] = set(classes_children.keys())  # для обновления возвращаемых значений методов и свойств
     enum_names: set[str] = set(enum_topics.keys())  # для обновления возвращаемых значений методов и свойств
@@ -107,13 +111,13 @@ def update_pylibs_from_topics(
     # чтобы потом при обновлении классов можно было удалить те class_entries,
     # которые уже объявлены в base_classes
 
-    print(f"Обновление свойств/методов...")
+    logger.info(f"Обновление свойств/методов...")
     count: int = 0
 
     for name, topic in class_entry_topics.items():
-        print(f"{name} для '{topic.own_name}'")
+        logger.debug(f"{name} для '{topic.own_name}'")
         if not name in pylib_entries:
-            print(f"update_pylibs_from_topics(): Предупреждение: не найдено имя среди pylib_entries: '{name}' у {topic}", file=sys.stderr)
+            logger.warning(f"update_pylibs_from_topics(): Предупреждение: не найдено имя среди pylib_entries: '{name}' у {topic}")
             continue
 
         py_entry: PythonEntry = pylib_entries[name]
@@ -161,7 +165,7 @@ def update_pylibs_from_topics(
 
                     if return_type_to_search in class_names:
                         filtered_types.append(return_type_to_add)
-                        print(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
+                        logger.debug(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
                         continue
 
                     # попытка исправления типа возврата путем дописывания 'ks'
@@ -171,20 +175,20 @@ def update_pylibs_from_topics(
 
                     if return_type_to_search in class_names:
                         filtered_types.append(return_type_to_add)
-                        print(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
+                        logger.debug(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
                         continue
                     if return_type_to_search in enum_names:
                         return_type_to_add = "int"
                         filtered_types.append(return_type_to_add)
-                        print(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
+                        logger.debug(f"_filter_return_types(): тип возврата исправлен на {repr(return_type_to_add)} из {repr(return_type)} среди {return_types} у {topic}")
                         continue
 
-                    print(f"_filter_return_types(): Предупреждение: сомнительный тип возврата: {repr(return_type)} среди {return_types} у {topic}", file=sys.stderr)
+                    logger.warning(f"_filter_return_types(): Предупреждение: сомнительный тип возврата: {repr(return_type)} среди {return_types} у {topic}")
                 return filtered_types
             return_type = "|".join(_filter_return_types(topic.value_types["return"].split("|")))
 
             if return_type != "":
-                print(f"\tвозвращаемое значение: {return_type}")
+                logger.debug(f"\tвозвращаемое значение: {return_type}")
                 if isinstance(py_entry, PythonFunction):
                     py_entry.return_type = return_type
                 if isinstance(py_entry, PythonVariable):
@@ -192,37 +196,37 @@ def update_pylibs_from_topics(
 
         count += 1
 
-    print(f"Обновлены {count} свойств/методов.")
+    logger.info(f"Обновлены {count} свойств/методов.")
 
 
     ### обновление interfaces
 
-    print(f"Обновление классов...")
+    logger.info(f"Обновление классов...")
     count: int = 0
 
     for name, topic in interface_topics.items():
-        print(f"{name} для '{topic.own_name}'")
+        logger.debug(f"{name} для '{topic.own_name}'")
         if not name in pylib_entries:
-            print(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди pylib_entries: '{name}' у {topic}", file=sys.stderr)
+            logger.error(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди pylib_entries: '{name}' у {topic}")
             continue
 
         py_class = pylib_entries[name]
         if not isinstance(py_class, PythonClass):
-            print(f"update_pylibs_from_topics(): Ошибка: объект '{name}' не является объектом класса PythonClass у {topic}", file=sys.stderr)
+            logger.error(f"update_pylibs_from_topics(): Ошибка: объект '{name}' не является объектом класса PythonClass у {topic}")
             continue
 
         entries_to_remove: set[str] = set()
         for cls_name in topic.hierarchy[0]:
             cls_name = classes.get_py_entry_full_name(cls_name, None)
             if not cls_name in classes_children:
-                print(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди classes_children '{cls_name}' у класса '{name}' у {topic}", file=sys.stderr)
+                logger.error(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди classes_children '{cls_name}' у класса '{name}' у {topic}")
                 continue
             entries_to_remove.update(classes_children[cls_name])
 
         update_class(py_class, topic, entries_to_remove)
         count += 1
 
-    print(f"Обновлены {count} классов.")
+    logger.info(f"Обновлены {count} классов.")
 
     ### обновление enums
 
@@ -240,7 +244,7 @@ def update_pylibs_from_topics(
 
     for name, py_entry in pylib_entries.items():
         if py_entry.doc == "":
-            print(f"update_pylibs_from_topics(): Предупреждение: Объект py_entry без документации: {repr(name)} для {repr(py_entry.name)}, href='{py_entry.href}'", file=sys.stderr)
+            logger.warning(f"update_pylibs_from_topics(): Предупреждение: Объект py_entry без документации: {repr(name)} для {repr(py_entry.name)}, href='{py_entry.href}'")
 
 
 def main(
@@ -261,23 +265,25 @@ def main(
 
 if __name__ == "__main__":
 
-    if len(sys.argv) < 2:
-        print(f"""\
-Usage:
-    {sys.argv[0]} what_to_do
+#     if len(sys.argv) < 2:
+#         print(f"""\
+# Usage:
+#     {sys.argv[0]} what_to_do
 
-what_to_do:
-    1  - KompasAPI 5
-    2  - KompasAPI 7
-    3 - both
-""")
-        sys.exit(1)
+# what_to_do:
+#     1  - KompasAPI 5
+#     2  - KompasAPI 7
+#     3 - both
+# """)
+#         sys.exit(1)
 
-    what_to_do = int(sys.argv[1])
-    do_k5 = bool(what_to_do & 0b0001)
-    do_k7 = bool(what_to_do & 0b0010)
+#     what_to_do = int(sys.argv[1])
+#     do_k5 = bool(what_to_do & 0b0001)
+#     do_k7 = bool(what_to_do & 0b0010)
 
-    ### main
+#     ### main
 
-    main(do_k5, do_k7)
+#     main(do_k5, do_k7)
+
+    main()
 
