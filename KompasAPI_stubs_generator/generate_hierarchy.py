@@ -103,9 +103,9 @@ def main(
         # do_k7: bool = True,
         ) -> None:
     topics: list[Topic] = []
-    topics.extend(parse_topics.load_topics(const.topics_filepath))
+    topics.extend(parse_topics.load_topics(const.get_topics_filepath()))
 
-    generate_and_write_hierarchy(topics, const.KompasAPIclassesHierarchy_file)
+    generate_and_write_hierarchy(topics, const.get_KompasAPIclassesHierarchy_file())
 
 
 

@@ -252,13 +252,13 @@ def main(
         do_k7: bool = True,
         ) -> None:
     jstopics: list[Topic] = []
-    jstopics.extend(parse_topics.load_topics(const.topics_filepath))
+    jstopics.extend(parse_topics.load_topics(const.get_topics_filepath()))
 
     if do_k7:
-        update_pylibs_from_topics(const.pylib_KAPI7_filepath_raw, const.pylib_KAPI7_filepath_updated, jstopics)
+        update_pylibs_from_topics(const.get_pylib_KAPI7_filepath_raw(), const.get_pylib_KAPI7_filepath_updated(), jstopics)
 
     if do_k5:
-        update_pylibs_from_topics(const.pylib_K6API5_filepath_raw, const.pylib_K6API5_filepath_updated, jstopics)
+        update_pylibs_from_topics(const.get_pylib_K6API5_filepath_raw(), const.get_pylib_K6API5_filepath_updated(), jstopics)
 
 
 

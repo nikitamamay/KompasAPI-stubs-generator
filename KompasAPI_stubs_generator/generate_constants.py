@@ -68,10 +68,10 @@ def write_constants(filepath: str, content: str) -> None:
 
 def main():
     jstopics: list[Topic] = []
-    jstopics.extend(parse_topics.load_topics(const.topics_filepath))
+    jstopics.extend(parse_topics.load_topics(const.get_topics_filepath()))
 
     content = generate_constants(jstopics)
-    write_constants(const.KompasAPIconstants_file, content)
+    write_constants(const.get_KompasAPIconstants_file(), content)
 
 
 

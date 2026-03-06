@@ -1009,9 +1009,9 @@ def load_topics(filepath: str) -> list[Topic]:
     return l
 
 
-def get_jstopics_filepaths(toc_entry: TOCEntry, sdk_base_dir: str) -> list[str]:
+def get_jstopics_filepaths(toc_entry: TOCEntry) -> list[str]:
     return [
-        os.path.join(const.get_jstopics_dir(sdk_base_dir), utils.ensure_ext(toc_entry.href, ".js"))
+        os.path.join(const.get_jstopics_dir(), utils.ensure_ext(toc_entry.href, ".js"))
         for toc_entry in
         parse_table_of_contents.get_toc_entries_list(toc_entry)
     ]
@@ -1040,38 +1040,37 @@ def sort_topics_by_toc(toc_entries_list: list[TOCEntry], topics: typing.Iterable
 
 
 def main(
-        sdk_base_dir: str,
         do_k5: bool = True,
         do_k7: bool = True,
         do_const: bool = True,
         ) -> None:
 
-    toc_entries: list[TOCEntry] = parse_table_of_contents.load_root_toc_entries(const.toc_filepath)
+    toc_entries: list[TOCEntry] = parse_table_of_contents.load_root_toc_entries(const.get_toc_filepath())
 
     filepaths: list[str] = []
 
     if do_k7:
         root_toc_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api7_root_topic_href, toc_entries, 1)
         assert isinstance(root_toc_entry, TOCEntry)
-        filepaths.extend(get_jstopics_filepaths(root_toc_entry, sdk_base_dir))
+        filepaths.extend(get_jstopics_filepaths(root_toc_entry))
 
     if do_k5:
         root_toc_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api5_root_topic_href, toc_entries, 1)
         assert isinstance(root_toc_entry, TOCEntry)
-        filepaths.extend(get_jstopics_filepaths(root_toc_entry, sdk_base_dir))
+        filepaths.extend(get_jstopics_filepaths(root_toc_entry))
 
     if do_const:
         root_toc_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_constants_topic_href, toc_entries, 3)
         assert isinstance(root_toc_entry, TOCEntry)
-        filepaths.extend(get_jstopics_filepaths(root_toc_entry, sdk_base_dir))
+        filepaths.extend(get_jstopics_filepaths(root_toc_entry))
 
     jstopics: list[Topic] = []
     jstopics.extend(parse_jstopics(filepaths))
 
     fix_jstopics_after_parsing(jstopics)
 
-    json_utils.save_json(const.topics_filepath, jstopics)
-    logger.info(f"Записано {len(jstopics)} объектов Topic в файл '{const.topics_filepath}'")
+    json_utils.save_json(const.get_topics_filepath(), jstopics)
+    logger.info(f"Записано {len(jstopics)} объектов Topic в файл '{const.get_topics_filepath()}'")
 
 
 

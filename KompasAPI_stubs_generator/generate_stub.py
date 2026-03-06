@@ -153,8 +153,8 @@ def main(
         do_k5: bool = True,
         do_k7: bool = True,
         ) -> None:
-    root_toc_entries: list[TOCEntry] = parse_table_of_contents.load_root_toc_entries(const.toc_filepath)
-    topics: list[Topic] = parse_topics.load_topics(const.topics_filepath)
+    root_toc_entries: list[TOCEntry] = parse_table_of_contents.load_root_toc_entries(const.get_toc_filepath())
+    topics: list[Topic] = parse_topics.load_topics(const.get_topics_filepath())
 
     if do_k7:
         root_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api7_root_topic_href, root_toc_entries)
@@ -169,7 +169,7 @@ def main(
             )
         ]
 
-        generate_pyi_module(const.pylib_KAPI7_filepath_updated, const.pyi_KAPI7_filepath, classes_order)
+        generate_pyi_module(const.get_pylib_KAPI7_filepath_updated(), const.get_pyi_KAPI7_filepath(), classes_order)
 
     if do_k5:
         root_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api5_root_topic_href, root_toc_entries)
@@ -184,7 +184,7 @@ def main(
             )
         ]
 
-        generate_pyi_module(const.pylib_K6API5_filepath_updated, const.pyi_K6API5_filepath, classes_order)
+        generate_pyi_module(const.get_pylib_K6API5_filepath_updated(), const.get_pyi_K6API5_filepath(), classes_order)
 
 
 

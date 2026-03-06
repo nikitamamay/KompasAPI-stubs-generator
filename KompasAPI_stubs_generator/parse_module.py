@@ -273,12 +273,12 @@ def main(
     if do_k5:
         Kompas6API5 = kompas_api_modules.get_Kompas6API5()
         contents = parse_module(Kompas6API5)
-        write_pylib(const.pylib_K6API5_filepath_raw, contents)
+        write_pylib(const.get_pylib_K6API5_filepath_raw(), contents)
 
     if do_k7:
         KompasAPI7 = kompas_api_modules.get_KompasAPI7()
         contents = parse_module(KompasAPI7)
-        write_pylib(const.pylib_KAPI7_filepath_raw, contents)
+        write_pylib(const.get_pylib_KAPI7_filepath_raw(), contents)
 
 
 

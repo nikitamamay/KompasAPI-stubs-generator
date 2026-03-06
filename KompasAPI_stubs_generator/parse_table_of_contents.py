@@ -88,11 +88,9 @@ def parse_toc_entry(
     return toc_entry
 
 
-def main(
-        sdk_base_dir: str,
-        ) -> None:
-    help_hmcontent_js_filepath: str = const.get_hmcontent_js_filepath(sdk_base_dir)
-    toc_filepath: str = const.toc_filepath
+def main() -> None:
+    help_hmcontent_js_filepath: str = const.get_hmcontent_js_filepath()
+    toc_filepath: str = const.get_toc_filepath()
 
     logger.info(f"Чтение JS/JSON из файла '{help_hmcontent_js_filepath}'...")
 
@@ -113,7 +111,7 @@ def main(
 
 
 def load_root_toc_entries(
-        toc_filepath: str = const.toc_filepath,
+        toc_filepath: str,
         ) -> list[TOCEntry]:
     toc_entries: list[TOCEntry] = json_utils.load_json_with_classes(toc_filepath, [TOCEntry])
     logger.info(f"Загружено оглавление из '{toc_filepath}'. Корневых записей: {len(toc_entries)}.")
