@@ -230,7 +230,7 @@ def render_table(
         row = []
         table.append(row)
         cell_tags = row_tag.find_all(recursive=False)  # TODO добавить поддержку tr, th; TODO добавить поддержку rowspan, colspan
-        for j, cell_tag in enumerate(cell_tags):
+        for i, cell_tag in enumerate(cell_tags):
             cell_content = render_pretty_single_line(cell_tag.get_text())  # TODO добавить поддержку многостроковых ячеек
             row.append(cell_content)
         max_column_count = max(max_column_count, len(cell_tags))
@@ -238,14 +238,29 @@ def render_table(
     column_widths: list[int] = [0 for i in range(max_column_count)]
 
     for row in table:
-        for j, cell in enumerate(row):
+        for i, cell in enumerate(row):
             for line in cell.splitlines(False):
-                column_widths[j] = max(column_widths[j], len(line))
+                column_widths[i] = max(column_widths[i], len(line))
 
     ### если пустая таблица
 
     if sum(column_widths) == 0:
         return ""
+
+    ### игнорирование пустых столбцов
+
+    ignored_indexes: list[int] = []
+    for i, width in enumerate(column_widths):
+        if width == 0:
+            ignored_indexes.append(i)
+
+    ### если с учетом проигнорированных столбцов осталась одна строка с одной ячейкой
+
+    if len(table) == 1:
+        rest_column_indexes = set(range(max_column_count)).difference(ignored_indexes)
+        if len(rest_column_indexes) == 1:
+            i = rest_column_indexes.pop()
+            return f"{table[0][i]}\n"
 
     ### отрисовка таблицы
 
@@ -255,8 +270,9 @@ def render_table(
     if do_render_horizontal_border:
         borders = vertical_borders().__iter__()
         s_table_length: int = len(next(borders))
-        for i in column_widths:
-            s_table_length += i + len(next(borders))
+        for i, width in enumerate(column_widths):
+            if i in ignored_indexes: continue
+            s_table_length += width + len(next(borders))
         s_horizontal_border = f" +{'-' * (s_table_length - 4)}+ \n"  # -2 потому что плюсы, и еще -2 потому что вокруг плюсов пробелы заменены на минусы
 
     string += s_horizontal_border
@@ -265,8 +281,9 @@ def render_table(
         s_row = ""
         borders = vertical_borders().__iter__()
         s_row += next(borders)
-        for j, cell in enumerate(row):
-            s_row += cell.ljust(column_widths[j]) + next(borders)
+        for i, cell in enumerate(row):
+            if i in ignored_indexes: continue
+            s_row += cell.ljust(column_widths[i]) + next(borders)
 
         string += s_row + "\n" + s_horizontal_border
 
@@ -307,7 +324,7 @@ def parse_description_table(
         #     tag.extract()
 
         output += render_table(table_tag, False, lambda: _vertical_borders_comments())
-        output = re_stars_in_brackets.subn("", output)[0]
+        # output = re_stars_in_brackets.subn("", output)[0]  # пусть звездочки останутся
 
     else:
         s_table = render_table(table_tag)
