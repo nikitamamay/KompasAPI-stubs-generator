@@ -20,12 +20,12 @@ from .classes import CLASS_NAME_IDispatch
 
 
 def fix_body(body: Tag, jstopic_own_href: str) -> None:
-    def _add_parent_href(body: Tag, parent_href: str) -> None:
-        t = Tag(name="p", attrs={"class": "p_bodytext"})
-        a = Tag(name="a", attrs={"href": parent_href})
-        a.string = "Интерфейс..."
-        body.append(t)
-        t.append(a)
+    # def _add_parent_href(body: Tag, parent_href: str) -> None:
+    #     t = Tag(name="p", attrs={"class": "p_bodytext"})
+    #     a = Tag(name="a", attrs={"href": parent_href})
+    #     a.string = "Интерфейс..."
+    #     body.append(t)
+    #     t.append(a)
 
     def _fix_SyntaxCOM_wrap(body: Tag, syntaxCOM_text: str) -> None:
         bad_span = body.find("span", string="Синтаксис COM")  # type: ignore
@@ -48,14 +48,6 @@ def fix_body(body: Tag, jstopic_own_href: str) -> None:
         last_pHier_tag: Tag = body.find_all("p", attrs={"class": "p_Hier_0_BLANK"})[-1]
         last_pHier_tag.extract()
 
-    if jstopic_own_href == "ireport_stylescount.js":  # отсутствует ссылка на родительский интерфейс
-        _add_parent_href(body, "ireport.html")
-
-    if jstopic_own_href == "iembodiment_part.js":  # отсутствует ссылка на родительский интерфейс
-        _add_parent_href(body, "iembodiment.html")
-
-    if jstopic_own_href == "ispecificationobject_additionalcolumns.js":  # отсутствует ссылка на родительский интерфейс
-        _add_parent_href(body, "ispecificationobject.html")
 
     if jstopic_own_href == "icomponentpositioner7_initplanebyplacement.js":  # нет переноса после заголовка "Синтаксис COM"
         _fix_SyntaxCOM_wrap(body, "HRESULT InitPlaneByPlacement( IPlacement3D * Placement, BOOL * Result );")
@@ -69,18 +61,9 @@ def fix_body(body: Tag, jstopic_own_href: str) -> None:
 
     # страницы констант
 
-    if jstopic_own_href in ( # удаление первой строки-заголовка у таблицы
-            "obj3dtype.js"
-            "objtypes.js",
-            # "objects_select.js",  # первая строка сделана с colspan (как caption)
-            "drawingobjecttypeenum.js",
-            ):
-        body.find("table").find("tr").extract()   # type: ignore
-
-    if jstopic_own_href in ( # удаление заголовка таблицы, состоящего из двух строк
+    if jstopic_own_href in ( # удаление первой строки заголовка таблицы, состоящего из двух строк
             "ksarrowenum.js",
             ):
-        body.find("table").find("tr").extract()   # type: ignore
         body.find("table").find("tr").extract()   # type: ignore
 
     if jstopic_own_href == "ksconstrainttypeenum.js":  # написана русская 'к'
@@ -90,73 +73,66 @@ def fix_body(body: Tag, jstopic_own_href: str) -> None:
         body.find_all("td")[-2].string = "0x08"
 
 
-def is_useless_page(own_href: str) -> bool:
+def get_page_type(own_href: str) -> int:
     if own_href in (
-            # KAPI7:
+            "ksspcstyleparam_gettuning.js",
+            ):
+        return HelpPageType.PropertyOrMethod
+
+    if own_href in (
+            "idrawingobjects.js",  # страница интерфейса, но в заглавии нет слова "Интерфейс "
+            "ksribdefinition.js",  # страница интерфейса, но в заглавии нет слова "Интерфейс "
+            # "ikompasdocument2d.js",       # находятся внутри раздела "- методы"
+            # "ikompasdocument3d.js",       # находятся внутри раздела "- методы"
+            # "itextdocument.js",           # находятся внутри раздела "- методы"
+            # "ispecificationdocument.js",  # находятся внутри раздела "- методы"
+            ):
+        return HelpPageType.Interface
+
+    if own_href in (
             "iapplication_events.js",  # страница с перенаправлениями
             "bb2327204.js",  # страница с перенаправлениями
             "cj1798939.js",  # страница с перенаправлениями
-            # K6API5:
-            'ag91931.js',  # 'Методы вывода на экран'
-            'ag95246.js',  # 'Работа с файлами'
-            'ag92071.js',  # 'Сервисные функции'
-            'int_pr_curve.js',  # 'Интерфейсы пространственных кривых'
-            'nt_surface.js',  # 'Интерфейсы поверхностей'
-            'int_copy.js',  # 'Интерфейсы копирования'
-            'i.js',  # 'Интерфейсы копирования компонентов сборки'
-            'int_operation.js',  # Интерфейсы формообразующих операций'
-            'int_additional.js',  # Интерфейсы дополнительных элементов'
-            'bt1730611.js',  # 'Аннотационные объекты'
-            'bt1730612.js',  # 'Составные объекты'
-            'bt1730613.js',  # 'Стили'
-            'bt1756228.js',  # 'Окна'
-            'bt1730186.js',  # 'Параметры'
-            'bt1730197.js',  # 'Связи и ограничения'
-            'bt1742269.js',  # 'Навигация'
-            'bt1744101.js',  # 'Параметрические переменные'
-            'bt1730260.js',  # 'Работа с документом'
-            'bt1730281.js',  # 'Оформление чертежа'
-            'bt1732733.js',  # 'Группы объектов'
-            'bt1734633.js',  # 'Операции редактирования'
-            'bt1730357.js',  # 'Редактирование графических объектов'
-            'bt1730395.js',  # 'Создание видов'
-            'bt1732273.js',  # 'Работа со слоями'
-            'bt1731191.js',  # 'Текстовые надписи'
-            'bt1731193.js',  # 'Работа с таблицей и с допуском формы'
-            'bt1730488.js',  # 'Размеры и технологические обозначения'
-            'bt1756850.js',  # 'Матрицы преобразования'
-            'bt1730616.js',  # 'Графические примитивы'
-            'cc1711098.js',  # 'Интерфейсы фантомов'
-            'cc1711812.js',  # 'Интерфейсы видов, слоев, запроса к системе'
-            'cd1743949.js',  # 'Интерфейсы параметров графических примитивов'
-            'cd1711795.js',  # 'Интерфейсы точек касания и сопряжения'
-            'ce1717197.js',  # 'Интерфейсы параметров формата и компоновки чертежа'
-            'cf1711377.js',  # 'Интерфейсы параметров стилей объектов'
-            'cf1713887.js',  # 'Интерфейсы параметров размеров'
-            'ch1786244.js',  # 'Интерфейсы параметров обозначений'
-            'ch1780203.js',  # 'Интерфейсы спецификации'
-            'ck1918891.js',  # 'Интерфейсы параметров элементов текста'
-            "int_geometry.js",
             ):
-        return True
-    return False
+        return HelpPageType.Useless
+
+    return HelpPageType.Unknown
 
 
-def is_interface_page(own_href: str) -> bool|None:
-    if own_href in (
-            "idrawingobjects.js",  # страница интерфейса, но в заглавии нет слова "Интерфейс "
-            "izonedivision.js"  # написано "Интерфей " с пропущенной "с"
+def fix_parent_interface_href(own_href: str) -> str|None:
+    # должно найти через breadcrumbs:
+        # if parent_interface_href == "propertymanagernotify.js":
+        #     return "kspropertymanagernotify.js"
+
+        # if jstopic_own_href == "ireport_stylescount.js":  # отсутствует ссылка на родительский интерфейс
+        #     _add_parent_href(body, "ireport.html")  # измени на .js
+
+        # if jstopic_own_href == "iembodiment_part.js":  # отсутствует ссылка на родительский интерфейс
+        #     _add_parent_href(body, "iembodiment.html")  # измени на .js
+
+        # if jstopic_own_href == "ispecificationobject_additionalcolumns.js":  # отсутствует ссылка на родительский интерфейс
+        #     _add_parent_href(body, "ispecificationobject.html")  # измени на .js
+
+    if own_href == "ikompasdocument2d1_libprocess.js":  # parent_interface_href дана неверная
+        return "ikompasdocument2d1.js"
+
+    if own_href in (  # даны parent_interface_href для "IModelObject"
+            'idiametraldimension3d_getcenterpoint.js',
+            'idiametraldimension3d_getsurfacepoint.js',
+            'idiametraldimension3d_setcenterpoint.js',
+            'idiametraldimension3d_setsurfacepoint.js',
             ):
-        return True
+        return "idiametraldimension3d.js"
+
+    if own_href in ( # даны parent_interface_href для "IModelObject"
+            'iradialdimension3d_getcenterpoint.js',
+            'iradialdimension3d_getsurfacepoint.js',
+            'iradialdimension3d_setcenterpoint.js',
+            'iradialdimension3d_setsurfacepoint.js',
+            ):
+        return "iradialdimension3d.js"
 
     return None
-
-
-def fix_parent_interface_href(parent_interface_href: str, own_href: str) -> str:
-    if parent_interface_href == "propertymanagernotify.js":
-        return "kspropertymanagernotify.js"
-
-    return parent_interface_href
 
 
 def fix_interface_name(text: str, own_href: str = "") -> str:
@@ -215,6 +191,7 @@ def fix_class_hierarchy(own_href: str) -> list[list[str]] | None:
 
     if own_href in (
             "imateconstraints3d.js",  # догадка судя по свойствам и методам в KompasAPI7.py
+            "iangledimensions3d.js",  # зачем-то вписан IModelObject после IKompasCollection
             ):
         return [["IKompasCollection"], []]
 
@@ -236,6 +213,9 @@ def fix_property_or_method_name(text: str, own_href: str) -> str:
     if own_href == "ksdocument3dnotify7_choicematerial.js":  # русская С в названии
         return "ChoiceMaterial"
 
+    if own_href == "ksrasterformatparam_colortype.js":
+        return "colorType"  # русская с в названии
+
     # if own_href == "ikompaserror_clear.js":  # написано "Clear- Сбросить ошибку", поэтому RegExp не срабатывает с наличием "-" после слова
     #     return "Clear"
 
@@ -248,9 +228,11 @@ def fix_enum_name(text: str, own_href: str) -> str:
     if own_href == "objtypes.js":
         return "DrawingObjectTypeEnum"
 
+    if own_href == "obj3dtype.js":
+        return "ksObj3dTypeEnum"  # случаи с "Obj3dTypeEnum" будут автоматически исправлены на "ksObj3dTypeEnum"
 
 
-    if text == "":
+    if text == "":  # для случая ENUM_UNNAMED
         return text
 
     if not text.isidentifier() or not text.isascii():
@@ -258,18 +240,40 @@ def fix_enum_name(text: str, own_href: str) -> str:
     return text
 
 
-def fix_enum_table_cell_indexes(own_href: str) -> tuple[int, int]:
-    if own_href == "objtypes.js":
-        return (1, 2)
+def does_enum_table_have_header_row(own_href: str) -> bool:
+    if own_href in (
+            "obj3dtype.js",
+            "objtypes.js",
+            "drawingobjecttypeenum.js",
+            "ksarrowenum.js",
+            "ksrequestfilestypeenum.js",
+            ):
+        return True
+    return False
+
+
+def fix_enum_table_cell_indexes(own_href: str) -> tuple[int, int, list[int]]:
+    """
+    Возвращает индексы столбцов: `(member_name_index, member_value_index, member_description_indexes)`:
+    * `member_name_index: int` - индекс столбца с идентификатором.
+        Если вернуть число `-1`, то этот индекс будет найден автоматически;
+    * `member_value_index: int` - индекс столбца со значением.
+        Если вернуть число `-1`, то этот индекс будет найден автоматически;
+    * `member_description_indexes: list[int]` - индексы столбцов, которые пойдут в описание.
+        Если вернуть пустой список `[]`, то эти индексы будут найдены автоматически.
+        Если вернуть список `[-1]`, то ни один столбец не будет задействован для описания.
+
+    Используй также `does_enum_table_have_header_row()`.
+    """
 
     if own_href in (
             "stypes.js",  # самая первая строка не_имеет идентификатора
             ):
-        return (0, 1)
+        return (0, 1, [])
 
-    "ksarrowenum.js"  # TODO
+    # TODO все те enums, у которых does_enum_table_have_header_row() == True
 
-    return (-1, -1)
+    return (-1, -1, [])
 
 
 def fix_function_return_type(own_href: str) -> str|None:

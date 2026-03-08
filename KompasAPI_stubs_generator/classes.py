@@ -1,3 +1,8 @@
+
+from . import logging_system
+logger = logging_system.get_logger(__name__)
+
+
 import typing
 
 from .utils import json_utils
@@ -15,18 +20,19 @@ CLASS_NAME_IDispatch = "IDispatch"
 class HelpPageType:
     Unknown = 0
     Interface = 1
-    LinkListPage = 2
-    PropertyOrMethod = 4
-    Enum = 8
-    EmptyPage = 16
+    Enum = 2
+    PropertyOrMethod = 3
+    Event = 4
+    EmptyPage = -1
+    LinkListPage = -2
+    Useless = -3
+
 
     @staticmethod
-    def str_from_int(value: int) -> str:
-        if value == 1: return "Interface"
-        if value == 2: return "LinkListPage"
-        if value == 4: return "PropertyOrMethod"
-        if value == 8: return "Enum"
-        if value == 16: return "EmptyPage"
+    def str_from_int(page_type: int) -> str:
+        for key, value in vars(HelpPageType).items():
+            if key[0].isupper() and value == page_type:
+                return key
         return "Unknown"
 
 
@@ -35,8 +41,8 @@ class Topic(json_utils.JSONable):
     Представляет собой страницу Справки Компас SDK.
     """
     def __init__(self) -> None:
-        self.own_href: str = ""
-        """ Ссылка на страницу. Должна иметь расширение `.js`. """
+        self.own_hrefs: list[str] = [""]
+        """ Ссылки на страницы Справки. Должны иметь расширение `.js`. В списке должна быть хоть одна пустая строка `""`. """
         self.own_name: str = ""
         """ Имя интерфейса, метода или свойства, которое описывается этой страницей. """
         self.page_type: int = HelpPageType.Unknown
@@ -63,11 +69,13 @@ class Topic(json_utils.JSONable):
         """ Описание в pyi-совместимом виде. """
         self.enum_members: list[list[str]] = []
         """ Члены перечисления в виде `[ [name, value, member_docstring], ... ]` """
+        self.breadcrumbs_links: list[str] = []
+        """ Ссылки из "хлебных крошек". Каждая должна иметь расширение `.js`. """
 
         self.hmTitle: str = ""
         """ Заголовок страницы. """
         self.hmBreadCrumbs: str = ""
-        """ "Хлебные крошки", то есть путь к этой странице в Справке. """
+        """ "Хлебные крошки" в виде строки, то есть путь к этой странице в Справке. """
 
         self.hmDescription: str = ""
         self.hmKeywords: str = ""
@@ -93,18 +101,16 @@ class Topic(json_utils.JSONable):
                     "hmTitlePath",
                     "hmHeader",
                     "hmBody",
-
-                    "subsections_hrefs"
                     ):
                 d[key] = v[key]
         return d
 
     def __repr__(self) -> str:
         s_own_name = f"own_name={repr(self.own_name)}, " if self.own_name != "" else ""
-        s_parent_name = repr(self.parent_interface_name) if self.parent_interface_name != "" else repr(self.parent_interface_href)
-        s_parent = f"parent_interface={s_parent_name}, " \
-            if s_parent_name != "" else ""
-        return f"<Topic own_href={repr(self.own_href)}, {s_own_name}{s_parent}page_type={HelpPageType.str_from_int(self.page_type)}>"
+        s_parent = f"parent_interface_name={repr(self.parent_interface_name)}, " \
+            if self.parent_interface_name != "" \
+            else f"parent_interface_href={repr(self.parent_interface_href)}, "
+        return f"<Topic own_hrefs={repr(self.own_hrefs)}, {s_own_name}{s_parent}page_type={HelpPageType.str_from_int(self.page_type)}>"
 
     __str__ = __repr__
 
@@ -122,7 +128,8 @@ class PythonEntry(json_utils.JSONable):
     def __init__(self) -> None:
         self.name: str = ""
         self.doc: str = ""
-        self.href: str = ""
+        self.hrefs: list[str] = [""]
+        """ Ссылки на страницы Справки. Должны быть с расширением `.js` """
 
 class PythonClass(PythonEntry):
     def __init__(self) -> None:
@@ -173,7 +180,7 @@ def get_py_entry_full_name(entry: PythonEntry|str, parent: PythonEntry|str|None)
     if isinstance(entry, PythonEntry):
         name = entry.name
     else:
-        name = entry
+        name = str(entry)
 
     if parent is not None:
         parent_name = get_py_entry_full_name(parent, None)
@@ -182,26 +189,40 @@ def get_py_entry_full_name(entry: PythonEntry|str, parent: PythonEntry|str|None)
     return name.lower() if DO_USE_LOWERCASE_NAMES else name
 
 
+def filter_by_type(list_jstopics: typing.Iterable[Topic], page_type: int) -> list[Topic]:
+    return list(filter(lambda t: t.page_type == page_type, list_jstopics))
 
-def filter_by_type(list_jstopics: typing.Iterable[Topic], page_type: int) -> dict[str, Topic]:
+def filter_by_type_as_dict(list_jstopics: typing.Iterable[Topic], page_type: int) -> dict[str, Topic]:
     """
-    Возвращает `{ "topic.own_name": <Topic>, ... }`.
+    Возвращает `{ <full_name>: <Topic>, ... }`.
+
+    `full_name` - см. `get_topic_full_name()`.
     """
-    interfaces: dict[str, Topic] = {}
+    names_and_topics: dict[str, Topic] = {}
+
     for topic in list_jstopics:
         if topic.page_type == page_type:
+            if topic.own_name == ENUM_UNNAMED:
+                continue
+
             name = get_topic_full_name(topic)
-            interfaces[name] = topic
-    return interfaces
+            if name in names_and_topics:
+                logger.error(f"filter_by_type_as_dict(): Ошибка: повторяющееся имя: {repr(name)}, первичный: {names_and_topics[name]}, вторичный: {topic}")
+                continue
+
+            names_and_topics[name] = topic
+
+    return names_and_topics
 
 
 def find_jstopic_by_href(
         href: str,
         jstopics: list[Topic],
         ) -> Topic|None:
-    href = utils.ensure_ext(href, ".js")
+    assert href.endswith(".js"), f"Неожиданное расширение файла: {repr(href)}"
+    # href = utils.ensure_ext(href, ".js")
     for topic in jstopics:
-        if topic.own_href == href:
+        if href in topic.own_hrefs:
             return topic
     return None
 

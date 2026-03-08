@@ -20,6 +20,7 @@ import re
 
 from bs4 import BeautifulSoup, Tag, Comment
 from bs4.element import NavigableString, PageElement
+import copy  # для copy.deepcopy()
 
 from . import const
 
@@ -30,6 +31,7 @@ from .utils import json_utils
 from .utils import js_to_json
 from .utils import utils
 from .utils.utils import render_pretty_single_line
+from .utils import long_processing_indication
 
 from . import classes
 from .classes import HelpPageType, DescriptionSection, Topic, TOCEntry
@@ -37,11 +39,21 @@ from .classes import ANY_TYPE_NAME, ENUM_UNNAMED
 from .classes import CLASS_NAME_IDispatch
 
 
-# re_identifier = re.compile(r"\b[^\s\/\.]+\b")  # do not use!
-re_identifier_with_cyrillic = re.compile(r"\b(?!NURBS-)[A-Za-z_][A-Za-z0-9_КЕНХОРАВСМТехорас]*\b", )  # ложное срабатывание на некоторых методах с текстом "NURBS-кривые" и "NURBS-поверхности"  # не_ставить re.IGNORECASE !
-re_identifier_with_cyrillic_only = re.compile(r"^[A-Z_][A-Z0-9_КЕНХОРАВСМТехорас]*\b$", re.IGNORECASE)
+# ложное срабатывание на некоторых методах с текстом "NURBS-кривые" и "NURBS-поверхности"  # не_ставить re.IGNORECASE !
+re_identifier_with_cyrillic = re.compile(r"\b(?!NURBS)[A-Za-z_][A-Za-z0-9_КЕНХОРАВСМТехорас]*\b", )
 
-re_page_title_interface = re.compile(r"Интерфейс?ы? *-? *(\S+\b)")
+# ложное срабатывание на названиях интерфейсов с текстом "трехмерные NURBS" в K6API5
+re_identifier_with_cyrillic_only = re.compile(r"^(?!NURBS)[A-Za-z_][A-Za-z0-9_КЕНХОРАВСМТехорас]*$", )
+
+re_page_title_interface = re.compile(r"Интерфейс?ы?")  # (r"Интерфейс?ы? *-? *(\S+\b)")
+
+# не забывать про `API интерфейсов. Версия 7 > Документ > Базовые интерфейсы > Интерфейс IKompasDocument > IKompasDocument - методы` для `Интерфейс IKompasDocument2D`
+# и есть еще `API интерфейсов. Версия 5 > KompasObject - Интерфейс API КОМПАС > KompasObject - методы > Сервисные функции` для `ksEnableTaskAccess` и др.
+re_breadcrumps_property_or_method_endswith = re.compile(r"([cс]войств[ао]|методы?)$", re.IGNORECASE)
+re_breadcrumps_property_or_method_extra = re.compile(r"(KompasObject - методы|ksDocument2D - методы)", )
+
+re_breadcrumps_events = re.compile(r"([cс]обытия)$", re.IGNORECASE)
+re_breadcrumps_enum   = re.compile(r"(Константы API|Структуры параметров и константы)")
 
 re_heading_interface     = re.compile(r"Интерфейс ?\.{0,3}$")
 re_heading_example       = re.compile(r"Пример ?\.{0,3}$")
@@ -49,13 +61,14 @@ re_heading_events        = re.compile(r"Интерфейс событий ?\.{0,
 re_heading_description   = re.compile(r"Описание ?(|:|\.)$")
 re_heading_hierarchy     = re.compile(r"Иерархия ?(|:|\.)$")
 re_heading_notes         = re.compile(r"П?римечани[яе] ?(|:|\.)$")  # нет буквы П в 'itextline_level.js"
-re_heading_syntax_auto   = re.compile(r"(Синтаксис Automation ?(|:|\.)|Синтаксис ?:)$")
+re_heading_syntax_auto   = re.compile(r"(Синтаксис Automation ?(|:|\.)|Синтаксис ?:)$")  # Просто "Синтаксис:" - в ('ikompasdocument3d_enableundo.js', 'ikompasdocument3d_undocontainer.js')
 re_heading_syntax_com    = re.compile(r"Синтаксис (C|С)OM ?(|:|\.)$")
 re_heading_input_params  = re.compile(r"((В?ходные |)пара?метры|Входной параметр|Входные данные) ?(|:|\.)$", re.IGNORECASE)
 re_heading_output_params = re.compile(r"(Выходн(ые|ой) параметры?) ?(|:|\.)$", re.IGNORECASE)
 re_heading_return_value  = re.compile(r"(Возвращаемое значение) ?(|:|\.)$", re.IGNORECASE)
 
-re_starts_in_brackets = re.compile(r"(\(\s*(\*+)\s*\))")  # удаление строки с двумя звёздочками (типа "Получить свойство (**)")
+# удаление строки с двумя звёздочками (типа "Получить свойство (**)")
+re_stars_in_brackets = re.compile(r"(\(\s*(\*+)\s*\))")
 
 re_property_type = re.compile(r"^Тип данных ?: ?([^\n]+)", re.MULTILINE)
 re_bool_type     = re.compile(r"\b(BOOL|TRUE|FALSE)\b", re.IGNORECASE | re.MULTILINE)
@@ -65,11 +78,11 @@ re_float_type    = re.compile(r"\b(float|double)\b", re.IGNORECASE)
 re_any_type      = re.compile(r"\bVARIANT\b", re.IGNORECASE)
 re_None_type     = re.compile(r"\bNULL\b", re.IGNORECASE)
 
-# re_safearray = re.compile(r"\bSafeArray\b", re.IGNORECASE)
-re_vt_type       = re.compile(r"\bVT_[A-Z0-9]\b", re.IGNORECASE)
-re_vt_array_type = re.compile(r"\bVT_ARRAY *\|? *(VT_[A-Z0-9]+)\b", re.IGNORECASE)
+re_vt_type       = re.compile(r"\bVT_[A-Z0-9]+\b", )  # re.IGNORECASE)
+re_vt_array_type = re.compile(r"\bVT_ARRAY *\|? *(VT_[A-Z0-9]+)\b", )  # re.IGNORECASE)
 
-re_integer_only = re.compile(r"^([\+-]?\d+|0[xX]\d+)$")  # под 'only имеется в виду, что вся строка (все содержимое ячейки таблицы) будет соответствовать этому RegExp.  # спасает от случаев ложных срабатываний на строках типа "90 градусов".
+# под 'only имеется в виду, что вся строка (все содержимое ячейки таблицы) будет соответствовать этому RegExp.  # спасает от случаев ложных срабатываний на строках типа "90 градусов".
+re_integer_only = re.compile(r"^([\+-]?\d+|0[xX]\d+)$")
 
 
 VT_TYPES = {
@@ -261,7 +274,7 @@ def parse_description_table(
 
         to_extract: list[Tag] = []
         for tr_tag in table_tag.find_all("tr"):
-            m = re_starts_in_brackets.search(tr_tag.get_text())
+            m = re_stars_in_brackets.search(tr_tag.get_text())
             if m is not None:
                 if m.group(2) == "**":
                     to_extract.append(tr_tag)
@@ -269,7 +282,7 @@ def parse_description_table(
             tag.extract()
 
         output += render_table(table_tag, False, lambda: _vertical_borders_comments())
-        output = re_starts_in_brackets.subn("", output)[0]
+        output = re_stars_in_brackets.subn("", output)[0]
 
     else:
         output += render_table(table_tag) + "\n"
@@ -282,6 +295,7 @@ def parse_description_section(
         tags: list[Tag],
         description_data: DescriptionData,
         topic: Topic,
+        do_try_parse_value_types: bool,
         ) -> str:
     section_output: str = ""
 
@@ -308,77 +322,82 @@ def parse_description_section(
             section_output = f"### {section}\n\n" + section_output
 
 
-    ### определение типа свойства или возвращаемого значения метода
-    def _try_to_update_value_types():
-        match_of_re: list[re.Match] = [None] # type: ignore
-        def _assign_match(o) -> bool:
-            match_of_re[0] = o
-            return o
+    # определение типа свойства или возвращаемого значения метода
+    if do_try_parse_value_types:
+        def _try_to_update_value_types():
+            match_of_re: list[re.Match] = [None] # type: ignore
+            def _assign_match(o) -> bool:
+                match_of_re[0] = o
+                return o
 
-        if description_data.return_type == "" \
-                and section in (DescriptionSection.PlainDescription, DescriptionSection.ReturnValue):
-            obtained_return_type: str = ""
-            text_to_search_in: str = section_output
+            if description_data.return_type == "" \
+                    and section in (DescriptionSection.PlainDescription, DescriptionSection.ReturnValue):
+                obtained_return_type: str = ""
+                text_to_search_in: str = section_output
 
-            # сужение области поиска до строки (если она есть) с текстом "Тип данных:"
-            if _assign_match(re_property_type.search(section_output)):
-                text_to_search_in = match_of_re[0].group(1)
+                # сужение области поиска до строки (если она есть) с текстом "Тип данных:"
+                if _assign_match(re_property_type.search(section_output)):
+                    text_to_search_in = match_of_re[0].group(1)
 
-            # найденные типы
-            if re_bool_type.search(text_to_search_in):
-                obtained_return_type = "bool"
+                # найденные типы
+                if re_bool_type.search(text_to_search_in):
+                    obtained_return_type = "bool"
 
-            elif re_str_type.search(text_to_search_in):
-                obtained_return_type = "str"
+                elif re_str_type.search(text_to_search_in):
+                    obtained_return_type = "str"
 
-            elif re_int_type.search(text_to_search_in):
-                obtained_return_type = "int"
+                elif re_int_type.search(text_to_search_in):
+                    obtained_return_type = "int"
 
-            elif re_float_type.search(text_to_search_in):
-                obtained_return_type = "float"
+                elif re_float_type.search(text_to_search_in):
+                    obtained_return_type = "float"
 
-            # elif re_safearray.search(text_to_search_in):
-            #     obtained_return_type = "list"
+                # elif re_safearray.search(text_to_search_in):
+                #     obtained_return_type = "list"
 
-            elif _assign_match(re_vt_array_type.search(text_to_search_in)):
-                obtained_return_type = f"list[{get_VT_type(match_of_re[0].group(1))}]"
+                elif _assign_match(re_vt_array_type.search(text_to_search_in)):
+                    obtained_return_type = f"list[{get_VT_type(match_of_re[0].group(1))}]"
 
-            elif _assign_match(re_vt_type.search(text_to_search_in)):
-                obtained_return_type = f"{get_VT_type(match_of_re[0].group(1))}"
+                elif _assign_match(re_vt_type.search(text_to_search_in)):
+                    obtained_return_type = f"{get_VT_type(match_of_re[0].group(1))}"
 
-            elif re_any_type.search(text_to_search_in):
-                obtained_return_type = ANY_TYPE_NAME
+                elif re_any_type.search(text_to_search_in):
+                    obtained_return_type = ANY_TYPE_NAME
 
-            elif re_None_type.search(text_to_search_in):
-                obtained_return_type = "None"
+                elif re_None_type.search(text_to_search_in):
+                    obtained_return_type = "None"
 
-            else:
-                obtained_types: list[str] = []
-                for s in re_identifier_with_cyrillic.finditer(text_to_search_in):
-                    t = utils.ensure_latin(s.group(0))
-                    if t.isascii():
-                        obtained_types.append(t)
-
-                obtained_return_type = "|".join(obtained_types)
-
-            if obtained_return_type != "":
-                logger.debug(f"\t_try_to_update_value_types(): найденный тип данных = '{obtained_return_type}' у '{topic.own_href}'")
-                if description_data.return_type != "":
-                    description_data.return_type += "|" + obtained_return_type
                 else:
-                    description_data.return_type += obtained_return_type
+                    obtained_types: list[str] = []
+                    for s in re_identifier_with_cyrillic.finditer(text_to_search_in):
+                        t = utils.ensure_latin(s.group(0))
+                        if t.isascii():
+                            obtained_types.append(t)
 
-    _try_to_update_value_types()
+                    obtained_return_type = "|".join(obtained_types)
+
+                if obtained_return_type != "":
+                    logger.debug(f"_try_to_update_value_types(): найден тип данных возвращаемого значения: '{obtained_return_type}' у '{topic.own_hrefs[0]}'")
+                    if description_data.return_type != "":
+                        description_data.return_type += "|" + obtained_return_type
+                    else:
+                        description_data.return_type += obtained_return_type
+
+        _try_to_update_value_types()
 
     return section_output
 
-def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
+def parse_description(
+        tag_help_body: Tag,
+        topic: Topic,
+        do_try_parse_value_types: bool,
+        ) -> DescriptionData:
     """
     Выполняет парсинг тела страницы
     и в конечном счете формирует python docstring (`__doc__`) - описание объекта
     (интерфейса, свойства, метода или др.).
     """
-    own_href = topic.own_href
+    own_href = topic.own_hrefs[0]
     description_data = DescriptionData()
 
     ### этап 1: разложение тегов по разделам
@@ -402,9 +421,13 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
             tag_has_bold_text: bool = has_bold_text(tag)
             tag_class: str = " ".join(tag.get_attribute_list("class"))
 
-            # пропуск ссылок на подразделы и пропуск тегов иерархии
-            if tag_class in ("p_Z_LOC_TOC_Title", "p_Z_LOC_TOC") \
-                    or tag_class.startswith("p_Hier_"):
+            # сделан ранее в parse_single_jstopic() путем extract_subsections_hrefs()
+            # # пропуск ссылок на подразделы
+            # if tag_class in ("p_Z_LOC_TOC_Title", "p_Z_LOC_TOC"):
+            #     continue
+
+            # пропуск тегов иерархии
+            if tag_class.startswith("p_Hier_"):
                 continue
 
             tag_text = render_pretty_single_line(tag.get_text().replace("\n", " "))
@@ -421,7 +444,6 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
                     description_data.parent_interface_href = str(tag_a.attrs["href"])
                     if description_data.parent_interface_href != "":
                         description_data.parent_interface_href = utils.ensure_ext(description_data.parent_interface_href, ".js")
-                        description_data.parent_interface_href = parser_injections.fix_parent_interface_href(description_data.parent_interface_href, own_href)
                 continue
 
             if re_heading_example.match(tag_text):
@@ -451,7 +473,6 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
                 continue
 
             if re_heading_syntax_auto.match(tag_text):
-                # Просто "Синтаксис:" - в ('ikompasdocument3d_enableundo.js', 'ikompasdocument3d_undocontainer.js')
                 current_section = DescriptionSection.SyntaxAutomation
                 continue
 
@@ -519,17 +540,7 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
         description_data.return_type = return_type
 
     ### этап 2: сборка текста (генерация docstring)
-
-    # заголовок
-    description_data.docstring = f"## {utils.render_pretty_single_line(topic.hmTitle)}\n\n"
-
-    # # хлебные крошки
-    # if topic.hmBreadCrumbs != "":
-    #     description_data.docstring += f"Путь в Справке: {topic.hmBreadCrumbs}.\nФайл в Справке: `{utils.ensure_ext(topic.own_href, ".html")}`.\n\n"
-
-    # ссылка на страницу Справки с примером
-    if description_data.example_href != "":
-        description_data.docstring += f"Пример в Справке: `{description_data.example_href}`\n\n"
+    output: str = ""
 
     # содержимое разделов страницы Справки
     for section in (  # порядок секций
@@ -543,9 +554,26 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
             DescriptionSection.ReturnValue,
             ):
         if section in sections:
-            description_data.docstring += parse_description_section(section, sections[section], description_data, topic)
+            output += parse_description_section(section, sections[section], description_data, topic, do_try_parse_value_types)
 
-    description_data.docstring = description_data.docstring
+    # заголовок
+    if output != "":
+        # ссылка на страницу Справки с примером
+        s_example: str = ""
+        if description_data.example_href != "":
+            s_example = f"Пример в Справке: `{description_data.example_href}`\n\n"
+
+        # # хлебные крошки
+        # s_breadcrumps: str = ""
+        # if topic.hmBreadCrumbs != "":
+        #     s_breadcrumps = f"Путь в Справке: {topic.hmBreadCrumbs}.\nФайл в Справке: `{utils.ensure_ext(topic.own_href, ".html")}`.\n\n"
+
+        output = f"## {utils.render_pretty_single_line(topic.hmTitle)}\n\n{s_example}{output}"
+
+    description_data.docstring = output
+    pih: str|None = parser_injections.fix_parent_interface_href(own_href)
+    if pih is not None:
+        description_data.parent_interface_href = pih
 
     return description_data
 
@@ -553,104 +581,175 @@ def parse_description(tag_help_body: Tag, topic: Topic) -> DescriptionData:
 
 def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
     """ Возвращает `True`, если парсинг выполнен успешно. """
-    own_href = topic.own_href
+    own_href = topic.own_hrefs[0]
 
-    description_data = DescriptionData()
+    table_tags = body_tag.find_all("table")
 
-    name_cell_index: int = -1
-    value_cell_index: int = -1
-    name_cell_index, value_cell_index = parser_injections.fix_enum_table_cell_indexes(own_href)
-
-    table_tags = [
+    for table_tag in table_tags:
+        parent = table_tag.parent
         table_tag.extract()
-        for table_tag in body_tag.find_all("table")
-    ]  # FIXME разрешается ли несколько таблиц?
-    if len(table_tags) != 1:
-        logger.error(f"parse_description_for_enum(): Ошибка: Неверное количество таблиц ({len(table_tags)} шт.) у {topic}")
+        if parent is not None and parent.name == "div":
+            parent.extract()
+
+    if len(table_tags) == 0:
+        logger.debug(f"parse_description_for_enum(): Предупреждение: нет таблиц у {topic}")
+        return False
+
+    # FIXME разрешается ли несколько таблиц?
+    if len(table_tags) > 1:
+        logger.error(f"parse_description_for_enum(): Ошибка: таблиц больше одной ({len(table_tags)} шт.) у {topic}")
         return False
 
     table_tag: Tag = table_tags[0]
 
     ### исправление таблицы
     # удаление строк, в которых есть colspan или rowspan
-    tags_to_remove: list[Tag] = []
+    cells_to_multiply: list[Tag] = []
+    rows_to_remove: list[Tag] = []
     for tr_tag in table_tag.find_all("tr"):
-        if tr_tag.find(attrs={ "colspan": True }) or tr_tag.find(attrs={ "rowspan": True }):
-            tags_to_remove.append(tr_tag)
+        # if tr_tag.find(attrs={ "colspan": True }) or tr_tag.find(attrs={ "rowspan": True }):
+        #     rows_to_remove.append(tr_tag)
+        for td_tag in tr_tag.find_all(attrs={ "colspan": True }):
+            cells_to_multiply.append(td_tag)
+        if tr_tag.find(attrs={ "rowspan": True }):
+            rows_to_remove.append(tr_tag)
 
-    if len(tags_to_remove) > 0:
+    for td_tag in cells_to_multiply:
+        try:
+            count_to_add: int = int(str(td_tag.attrs.get("colspan", "1"))) - 1
+        except Exception as e:
+            logger.critical(f"parse_description_for_enum(): Ошибка: невозможно привести к int значение colspan в таблице у {topic}", exc_info=True)
+            return False
+        del td_tag.attrs["colspan"]
+        while count_to_add > 0:
+            td_copy = copy.deepcopy(td_tag)
+            td_tag.insert_after(td_copy)
+            count_to_add -= 1
+
+    if len(rows_to_remove) > 0:
         logger.warning(f"parse_description_for_enum(): Предупреждение: таблица содержит некорректные строки (colspan, rowspan) у {topic}")
-        for tag in tags_to_remove:
+        for tag in rows_to_remove:
             tag.extract()
 
 
     ### понимание того, что где в каком столбце:
     # сначала ищется столбец с идентификатором - это имена (enum members);
     # затем - столбец с цифрами - это значения (enum values);
-    # остальные столбцы - это комментарии
+    # остальные столбцы - это описание
+    # если есть заголовочная строка (has_header_row), то ячейки столбцов описания
+    # приводятся вместе с заголовком столбца
 
-    if name_cell_index == -1 or value_cell_index == -1:
+    has_header_row: bool = parser_injections.does_enum_table_have_header_row(own_href)
+    description_cells_headers: list[str] = []
+    header_row_td_tags: list[Tag] = []
+
+    # удаление первой заголовочной строки для дальнейшего парсинга строк с идентификаторами и значениями
+    # и получение header_td_tags для первой строки заголовка
+    if has_header_row:
         row_tag = table_tag.find("tr")
         if row_tag is None:
-            logger.error(f"parse_description_for_enum(): Ошибка: не найдена строка таблицы у {topic}")
+            logger.error(f"parse_description_for_enum(): Ошибка: не найдена заголовочная строка таблицы у {topic}")
             return False
+        row_tag = row_tag.extract()
+        header_row_td_tags.extend(row_tag.find_all("td"))
 
-        td_tags = row_tag.find_all("td")
+    name_cell_index: int = -1
+    value_cell_index: int = -1
+    description_indexes: list[int] = []
+    name_cell_index, value_cell_index, description_indexes = parser_injections.fix_enum_table_cell_indexes(own_href)
 
-        for i, td_tag in enumerate(td_tags):
-            if search_identifier(td_tag.get_text().strip(), do_match = True) != "":
+    # получение first_data_row_td_tags для первой строки с данными
+    row_tag = table_tag.find("tr")
+    if row_tag is None:
+        logger.error(f"parse_description_for_enum(): Ошибка: не найдена первая строка таблицы с данными (has_header_row={has_header_row}) у {topic}")
+        return False
+    first_data_row_td_tags = row_tag.find_all("td")
+
+    # заполнение заголовков столбцов описания пустыми строками - пока. См. ниже.
+    description_cells_headers.extend(["" for i in first_data_row_td_tags])
+
+    # автоматический поиск столбца с идентификатором
+    if name_cell_index == -1:
+        for i, td_tag in enumerate(first_data_row_td_tags):
+            td_text = utils.render_pretty_single_line(td_tag.get_text())
+            if search_identifier(td_text, do_match = True) != "":
                 name_cell_index = i
+                break  # FIXME не сломает ли этот break другие enums?
 
         if name_cell_index == -1:
-            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}")
+            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца name_cell_index (has_header_row={has_header_row}) у {topic}")
             return False
 
-        for i, td_tag in enumerate(td_tags):
+    # автоматический поиск столбца со значением
+    if value_cell_index == -1:
+        for i, td_tag in enumerate(first_data_row_td_tags):
             if i == name_cell_index: continue
-            if re_integer_only.match(td_tag.get_text().strip()) is not None:
+            td_text = utils.render_pretty_single_line(td_tag.get_text())
+            if re_integer_only.match(td_text) is not None:
                 value_cell_index = i
+                break  # FIXME не сломает ли этот break другие enums?
 
         if value_cell_index == -1:
-            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца с идентификатором enum у {topic}")
+            logger.error(f"parse_description_for_enum(): Ошибка: не определен индекс столбца value_cell_index (has_header_row={has_header_row}) у {topic}")
             return False
 
-        logger.debug(f"parse_description_for_enum(): индексы столбцов у enum: name={name_cell_index}, value={value_cell_index} у {topic}")  # не надо в stderr
+        logger.debug(f"parse_description_for_enum(): индексы столбцов у enum: name={name_cell_index}, value={value_cell_index}, has_header_row={has_header_row} у {topic}")  # не надо в stderr
+
+    # назначение оставшихся столбцов как столбцов описания
+    if len(description_indexes) == 0:
+        for i, td_tag in enumerate(first_data_row_td_tags):
+            if i == name_cell_index: continue
+            if i == value_cell_index: continue
+            description_indexes.append(i)
+
+    # назначение заголовков столбцов описания, если известно, что у таблицы есть заголовки в первой строке
+    if has_header_row:
+        for i in description_indexes:
+            description_cells_headers[i] = utils.render_pretty_single_line(header_row_td_tags[i].get_text())
+            if description_cells_headers[i] != "":
+                description_cells_headers[i] = f"{description_cells_headers[i]}: "
 
     ### парсинг
 
     # к этому моменту из body_tag извлечены таблицы с enum members, поэтому они не попадут в docstring.
-    docstring = parse_description(body_tag, topic).docstring
+    enum_docstring = parse_description(body_tag, topic, False).docstring
 
     enum_members: list[list[str]] = []
 
-    for row_tag in table_tag.find_all("tr"):
-        name: str = ""
-        value: str = ""
-        other: list[str] = []
+    for j, row_tag in enumerate(table_tag.find_all("tr")):
+        member_name: str = ""
+        member_value: str = ""
+        member_description_lines: list[str] = []
 
         for i, td_tag in enumerate(row_tag.find_all("td", recursive=False)):
             td_text = render_pretty_single_line(td_tag.get_text())
             if i == name_cell_index:
-                name = td_text
+                member_name = td_text
             elif i == value_cell_index:
-                value = td_text
+                member_value = td_text
+            elif i in description_indexes:
+                if td_text != "":
+                    member_description_lines.append(f"{description_cells_headers[i]}{td_text}")
             else:
-                other.append(td_text)
+                pass # пропуск ячейки в этом столбце
 
-        if name == "" or value == "":
-            logger.error(f"parse_description_for_enum(): Ошибка: не извлечены имя и/или значение в строке таблицы еnum: name={repr(name)}, value={repr(value)} у {topic}")
+        if member_name == "":
+            logger.warning(f"parse_description_for_enum(): Предупреждение: не извлечено имя (member_name) в строке таблицы j={j}: name={repr(member_name)}, value={repr(member_value)} у {topic}")
+            continue
+        if member_value == "":
+            logger.warning(f"parse_description_for_enum(): Предупреждение: не извлечено значение (member_value) в строке таблицы j={j}: name={repr(member_name)}, value={repr(member_value)} у {topic}")
             continue
 
-        if not search_identifier(name, True):
-            logger.error(f"parse_description_for_enum(): Ошибка: некорректный идентификатор (enum member name) в строке таблицы: name={repr(name)}, value={repr(value)} у {topic}")
+        if not search_identifier(member_name, True):
+            logger.warning(f"parse_description_for_enum(): Предупреждение: некорректный идентификатор (member_name) в строке таблицы j={j}: name={repr(member_name)}, value={repr(member_value)} у {topic}")
             continue
 
-        member_docstring = "\n\n".join(other)
-        enum_members.append([name, value, member_docstring])
+        member_docstring = "\n\n".join(member_description_lines)
+        enum_members.append([member_name, member_value, member_docstring])
 
     ### применение свойств
 
-    topic.docstring = docstring
+    topic.docstring = enum_docstring
     topic.enum_members = enum_members
 
     return True
@@ -698,6 +797,13 @@ def parse_hierarchy(soup: Tag, interface_class_name: str, own_href: str) -> list
     return hierarchy
 
 
+def parse_breadcrumbs(body: Tag) -> tuple[str, list[str]]:
+    links: list[str] = []
+    for a_tag in body.find_all("a", attrs={ "href": True }):
+        href = utils.ensure_ext(str(a_tag.get("href", "")), ".js")
+        links.append(href)
+    text: str = render_pretty_single_line(body.get_text())
+    return text, links
 
 
 def parse_single_jstopic(
@@ -712,12 +818,14 @@ def parse_single_jstopic(
 
     jstopic = Topic()
     if own_href is None:
-        jstopic.own_href = os.path.split(filepath)[1]
+        jstopic.own_hrefs[0] = os.path.split(filepath)[1]
     else:
-        jstopic.own_href = own_href
+        jstopic.own_hrefs[0] = own_href
 
-    if parser_injections.is_useless_page(jstopic.own_href):
-        logger.debug(f"\tизвестно, что эта страница бесполезна.")
+    jstopic.page_type = parser_injections.get_page_type(jstopic.own_hrefs[0])
+
+    if jstopic.page_type == HelpPageType.Useless:
+        logger.debug(f"parse_single_jstopic(): Известно, что эта страница бесполезна: '{jstopic.own_hrefs[0]}'")
         return None
 
     with open(filepath, "r", encoding="utf-8") as f:
@@ -744,8 +852,8 @@ def parse_single_jstopic(
     ### парсинг html-контента объекта jstopic
     try:
         # breadcrumps
-        bc_soup = BeautifulSoup(jstopic.hmBreadCrumbs, "lxml")
-        jstopic.hmBreadCrumbs = render_pretty_single_line(bc_soup.get_text())
+        bc_body: Tag = BeautifulSoup(jstopic.hmBreadCrumbs, "lxml")  # .find("body") - не обязательно в данном случае
+        jstopic.hmBreadCrumbs, jstopic.breadcrumbs_links = parse_breadcrumbs(bc_body)
 
         # body
         soup = BeautifulSoup(jstopic.hmBody, "lxml")
@@ -753,7 +861,10 @@ def parse_single_jstopic(
         assert isinstance(body, Tag)
 
         # исправление косяков справки для некоторых известных страниц
-        parser_injections.fix_body(body, jstopic.own_href)
+        parser_injections.fix_body(body, jstopic.own_hrefs[0])
+
+        # удаление ссылок на подразделы
+        extract_subsections_hrefs(body)
 
         # удаление комментариев
         for tag in body.find_all(string=lambda text: isinstance(text, Comment)):
@@ -761,9 +872,15 @@ def parse_single_jstopic(
 
         ### здесь body готов для парсинга человекочитаемого description
 
-        def _parse_description() -> bool:
+        def _is_empty_page() -> bool:
+            for s in body.stripped_strings:
+                if len(s) > 0:
+                    return False
+            return True
+
+        def _parse_description(do_try_parse_value_types: bool) -> bool:
             """ Возвращает `True`, если текст описания непустой """
-            description_data: DescriptionData = parse_description(body, jstopic)
+            description_data: DescriptionData = parse_description(body, jstopic, do_try_parse_value_types)
             jstopic.docstring = description_data.docstring
             jstopic.parent_interface_href = description_data.parent_interface_href
             jstopic.example_href = description_data.example_href
@@ -771,49 +888,59 @@ def parse_single_jstopic(
             jstopic.value_types.update(description_data.input_parameters)
             return jstopic.docstring != ""
 
-        ### назначение типа страницы
+        ### определение типа страницы
 
-        def _is_interface_page():
-            is_interface_page: bool|None = parser_injections.is_interface_page(jstopic.own_href)
-            if is_interface_page is None:
-                return "Интерфей" in jstopic.hmTitle
-            return is_interface_page
+        if jstopic.page_type == HelpPageType.Unknown:
+
+            # страница перечня ссылок на свойства, методы, события
+            if jstopic.own_hrefs[0].endswith("_props.js") \
+                    or jstopic.own_hrefs[0].endswith("_methods.js") \
+                    or jstopic.own_hrefs[0].endswith("_propers.js") \
+                    or jstopic.own_hrefs[0].endswith("_events.js") \
+                    or re_breadcrumps_property_or_method_endswith.search(jstopic.hmTitle):
+                jstopic.page_type = HelpPageType.LinkListPage
+                logger.debug(f"parse_single_jstopic(): страница со ссылками. Пропуск. {jstopic}")
+                return None
+
+            # далее - определение интерфейса или метода/свойства:
+            # важно помнить о случаях:
+            # * в hmTitle для метода есть слово "Интерфейс": imathcurve3d_placement.js, imathsurface3d_placement.js, ireport_reportfilter.js и др.
+            # * hmBreadCrumbs    заканчиваются на "- методы", но интерфейс: "IKompasDocument2D" и др.
+            # * hmBreadCrumbs не_заканчиваются на "- методы", но метод: "ksEnableTaskAccess" и др.: "... KompasObject - методы > Сервисные функции"
+            #
+            # Решено: тип страницы "Interface" определяется перед типом "PropertyOrMethod".
+            # ложное определение метода как интерфейса - путем ручных правок в parser_injections.
+
+            # страница интерфейса
+            elif re_page_title_interface.search(jstopic.hmTitle):
+                jstopic.page_type = HelpPageType.Interface
+
+            # страница метода или свойства
+            elif re_breadcrumps_property_or_method_endswith.search(jstopic.hmBreadCrumbs) \
+                    or re_breadcrumps_property_or_method_extra.search(jstopic.hmBreadCrumbs):
+                jstopic.page_type = HelpPageType.PropertyOrMethod
+
+            # страница перечисления (enum)
+            elif re_breadcrumps_enum.search(jstopic.hmBreadCrumbs):
+                jstopic.page_type = HelpPageType.Enum
+
+            # страница события
+            elif re_breadcrumps_events.search(jstopic.hmBreadCrumbs):
+                jstopic.page_type = HelpPageType.Event
+
+            # страница неизвестного типа
+            else:
+                pass  # ниже останется только проверить, что у нее пустое description (тогда - нормально, пропуск); иначе - предупреждение, что что-то не так
+
 
         def _print_empty_own_name():
             logger.error(f"parse_single_jstopic(): Ошибка: не извлечено own_name из hmTitle={repr(jstopic.hmTitle)} у {jstopic}")
 
-        # страница перечня ссылок на свойства, методы, события
-        if jstopic.own_href.endswith("_props.js") \
-                or jstopic.own_href.endswith("_methods.js") \
-                or jstopic.own_href.endswith("_propers.js") \
-                or jstopic.own_href.endswith("_events.js") \
-                or jstopic.hmTitle.endswith("- свойства") \
-                or jstopic.hmTitle.endswith("- методы"):
-            jstopic.page_type = HelpPageType.LinkListPage
-            logger.debug(f"parse_single_jstopic(): Предупреждение: страница со ссылками. Пропуск. {jstopic}")
-            return None
-
-        # страница класса интерфейса
-        if _is_interface_page():
-            jstopic.page_type = HelpPageType.Interface
-            if not _parse_description():
-                logger.debug(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
-                return None
-
-            jstopic.own_name = parser_injections.fix_interface_name(search_identifier(jstopic.hmTitle), jstopic.own_href)
-            if jstopic.own_name == "":
-                _print_empty_own_name()
-                return None
-
-            jstopic.hierarchy = parse_hierarchy(body, jstopic.own_name, jstopic.own_href)
-            return jstopic
+        ### парсинг конкретного типа страницы
 
         # страница перечисления (enum)
-        if "Константы API" in jstopic.hmBreadCrumbs \
-                or "Структуры параметров и константы" in jstopic.hmBreadCrumbs:
-            jstopic.page_type = HelpPageType.Enum
-
-            jstopic.own_name = parser_injections.fix_enum_name(search_identifier(jstopic.hmTitle), jstopic.own_href)
+        if jstopic.page_type == HelpPageType.Enum:
+            jstopic.own_name = parser_injections.fix_enum_name(search_identifier(jstopic.hmTitle), jstopic.own_hrefs[0])
             if jstopic.own_name == "":
                 jstopic.own_name = ENUM_UNNAMED
 
@@ -822,38 +949,56 @@ def parse_single_jstopic(
 
             return jstopic
 
+        # если пустая страница - пропуск
+        # если непустая - этим вызовом произойдет парсинг описания для последующих случаев HelpPageType: Interface, PropertyOrMethod, Event
+        # эта проверка - обязательно после парсинга страницы HelpPageType.Enum, ведь там задействуется parse_description() особым образом!
+        if _is_empty_page():
+            jstopic.page_type = HelpPageType.EmptyPage
+            logger.debug(f"parse_single_jstopic(): страница без содержимого. Пропуск. {jstopic}")
+            return None
 
-        # страница метода или свойства
-        if "- свойства" in jstopic.hmBreadCrumbs \
-                or "- методы" in jstopic.hmBreadCrumbs:
-            jstopic.page_type = HelpPageType.PropertyOrMethod
-            if not _parse_description():
-                logger.debug(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
-                return None
-
-            jstopic.own_name = parser_injections.fix_property_or_method_name(search_identifier(jstopic.hmTitle), jstopic.own_href)
+        # страница класса интерфейса
+        if jstopic.page_type == HelpPageType.Interface:
+            jstopic.own_name = parser_injections.fix_interface_name(search_identifier(jstopic.hmTitle), jstopic.own_hrefs[0])
             if jstopic.own_name == "":
                 _print_empty_own_name()
                 return None
 
-            # не стоит пытаться найти parent_interface_href через hmBreadCrumps: это слишком сложно.
-            # Если уж править, то тогда в parser_injections добавлять ссылку на parent_interface_href в fix_body() для определенных страниц.
-            if jstopic.parent_interface_href == "":
-                logger.warning(f"parse_single_jstopic(): Предупреждение: пустой parent_interface_href у {jstopic}")
+            _parse_description(False)
+
+            # если после парсинга description обнаружилась ссылка на родительский интерфейс;
+            # может быть, это ложное срабатывание алгоритма определения типа страницы:
+            # на самом деле страница про метод, у которого в названии есть слово "Интерфейс"
+            if jstopic.parent_interface_href != "" \
+                    and re_breadcrumps_property_or_method_endswith.search(jstopic.hmBreadCrumbs):
+                logger.warning(f"parse_single_jstopic(): Предупреждение: тип страницы изначально определен как интерфейс, но далее будет обработан как свойство/метод: {jstopic}")
+                jstopic.page_type = HelpPageType.PropertyOrMethod
+                # нет return, чтобы дальше шла ветка `if jstopic.page_type == HelpPageType.PropertyOrMethod``
+
+            # нет, это истинный интерфейс
+            else:
+                jstopic.hierarchy = parse_hierarchy(body, jstopic.own_name, jstopic.own_hrefs[0])
+                return jstopic
+
+        # страница метода или свойства
+        if jstopic.page_type == HelpPageType.PropertyOrMethod:
+            jstopic.own_name = parser_injections.fix_property_or_method_name(search_identifier(jstopic.hmTitle), jstopic.own_hrefs[0])
+            if jstopic.own_name == "":
+                _print_empty_own_name()
+                return None
+
+            _parse_description(True)
+
+            # проверка на `jstopic.parent_interface_href == ""` перенесена в fix_jstopics_after_parsing().
+            # Там же будет попытка поиска по breadcrumbs_links.
 
             return jstopic
 
-        # # страница события
-        # if "- события" in jstopic.hmBreadCrumbs:
-        #     logger.warning(f"parse_single_jstopic(): Предупреждение: найдена страница события. Что с этим делать? {jstopic}")
-        #     pass  # TODO
-        #     return jstopic
-
-        # если пустая страница
-        if not _parse_description():
-            jstopic.page_type = HelpPageType.EmptyPage
-            logger.warning(f"parse_single_jstopic(): Предупреждение: страница без содержимого. Пропуск. {jstopic}")
-            return None
+        # страница события
+        if jstopic.page_type == HelpPageType.Event:
+            # logger.warning(f"parse_single_jstopic(): Предупреждение: найдена страница события. Что с этим делать? {jstopic}")
+            # pass  # TODO
+            return jstopic
 
         # страница чего-то другого
         logger.warning(f"parse_single_jstopic(): Предупреждение: страница неизвестного типа. {jstopic}")
@@ -873,20 +1018,27 @@ def parse_jstopics(
         filepaths: list[str],
         parsed_topics: set[str] = set(),
         ) -> list[Topic]:
+    logger.info(f"Парсинг {len(filepaths)} страниц справки...")
     jstopics: list[Topic] = []
 
-    for filepath in filepaths:
+    long_processing_indication.start_processing()
+
+    max_count = len(filepaths)
+    for i, filepath in enumerate(filepaths):
         jstopic_href = os.path.split(filepath)[1]
-        logger.debug(f"'{jstopic_href}'")
+        if long_processing_indication.check_processing():
+            logger.info(f"Прогресс: {i} / {max_count} (%.1f%%)", i / max_count * 100)
 
         if jstopic_href in parsed_topics:
-            logger.debug(f"\tПарсинг уже выполнен ранее для '{jstopic_href}'. Пропуск.")
+            logger.debug(f"parse_jstopics(): Парсинг уже выполнен ранее для '{jstopic_href}'. Пропуск.")
             continue
+
+        logger.debug(f"parse_jstopics(): Парсинг '{jstopic_href}'")
 
         parsed_topics.add(jstopic_href)
 
         topic = parse_single_jstopic(filepath, own_href=jstopic_href)
-        logger.debug(f"\ttopic={topic}")
+        logger.debug(f"parse_jstopics(): Результат парсинга: {topic}")
 
         if topic is None:
             continue
@@ -897,19 +1049,39 @@ def parse_jstopics(
     return jstopics
 
 
-def find_non_unique_topics(jstopics: typing.Iterable[Topic]) -> dict[str, list[Topic]]:
+def find_non_unique_topics(jstopics: typing.Iterable[Topic], page_type_filter: int|None = None) -> dict[str, list[Topic]]:
     names_and_topics: dict[str, list[Topic]] = {}
+
+    if page_type_filter is not None:
+        jstopics = classes.filter_by_type(jstopics, page_type_filter)
+
     for topic in jstopics:
         if topic.own_name != "" and topic.own_name != classes.ENUM_UNNAMED:
             name = classes.get_topic_full_name(topic)
             if not name in names_and_topics:
                 names_and_topics[name] = []
             names_and_topics[name].append(topic)
+
     return names_and_topics
 
 
+def merge_docstrings(doc1: str, doc2: str) -> tuple[str, int]:
+    if doc1 == "":
+        return (doc2, 1)
+    if doc2 == "":
+        return (doc1, 0)
+    index = 0 if len(doc1) >= len(doc2) else 1
+    doc = doc1.rstrip() + "\n\n----------\n\n" + doc2.lstrip()
+    return (doc, index)
 
-def _merge_enum_members(members_to_stay: list[list[str]], members_to_remove: list[list[str]]) -> None:
+
+def merge_hierarchy(hierarchy1: list[list[str]], hierarchy2: list[list[str]]) -> list[list[str]]:
+    if len(hierarchy1[0]) >= len(hierarchy2[0]):
+        return hierarchy1
+    return hierarchy2
+
+
+def merge_enum_members(members_to_stay: list[list[str]], members_to_remove: list[list[str]]) -> None:
     def _find_member(name: str) -> list[str]|None:
         for member in members_to_stay:
             n = member[0]
@@ -920,16 +1092,30 @@ def _merge_enum_members(members_to_stay: list[list[str]], members_to_remove: lis
     for r_member in members_to_remove:
         r_name, r_value, r_docstring = r_member
         s_member = _find_member(r_name)
-        if s_member is None: # если нет удаляемого member в списке остающихся members
+
+        # если нет удаляемого member в списке остающихся members (= простое добавление)
+        if s_member is None:
             members_to_stay.append(r_member.copy())
-        else: # если удаляемый member есть в списке остающихся members
+
+        # если удаляемый member есть в списке остающихся members (= слияние)
+        else:
             s_name, s_value, s_docstring = s_member
             if r_value != s_value:
                 logger.error(f"merge_enum_members(): Ошибка: для имен '{s_name}' разные значения: {repr(s_value)}, {repr(r_value)}")
                 continue
 
-            # r_member[2] = r_docstring if len(r_docstring) > len(s_docstring) else s_docstring
-            r_member[2] = r_docstring + "\n\n" + s_docstring
+            s_member[2], _ = merge_docstrings(s_docstring, r_docstring)
+
+
+def find_parent_interface_href_by_breadcrumbs(breadcrumbs_links: list[str], interfaces: list[Topic]) -> Topic|None:
+    i = len(breadcrumbs_links) - 1
+    while i >= 0:
+        href = breadcrumbs_links[i]
+        parent_topic = classes.find_jstopic_by_href(href, interfaces)
+        if parent_topic is not None:
+            return parent_topic
+        i -= 1
+    return None
 
 
 def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
@@ -939,65 +1125,115 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
     """
     logger.info(f"Исправление объектов jstopic после окончательного парсинга...")
 
-    ### проверка на уникальность наименований
+    ### назначение имен родительских интерфейсов (parent_interface_name) для страниц свойств/методов
+    # и попытка поиска родительского интерфейса через breadcrumbs_links
+
+    interfaces: list[Topic] = classes.filter_by_type(jstopics, HelpPageType.Interface)
+
+    found_parent_interface_count: int = 0
+    for topic in jstopics:
+        if topic.page_type == HelpPageType.PropertyOrMethod:
+            # если нет ссылки на родительский интерфейс (очень характерно для многих методов в K6API5)
+            if topic.parent_interface_href == "":
+                # попытка поиска родительского интерфейса через breadcrumbs_links
+                parent_topic = find_parent_interface_href_by_breadcrumbs(topic.breadcrumbs_links, interfaces)
+
+                if parent_topic is None:
+                    logger.error(f"fix_jstopics_after_parsing(): Ошибка: не найдена ссылка на родительский интерфейс через breadcrumbs_links у {topic}")
+                    continue
+
+                topic.parent_interface_href = parent_topic.own_hrefs[0]
+                topic.parent_interface_name = parent_topic.own_name
+                logger.debug(f"fix_jstopics_after_parsing(): Найдена ссылка на родительский интерфейс через breadcrumbs_links: {repr(topic.parent_interface_href)} у {topic}")
+                found_parent_interface_count += 1
+
+            # если уже есть ссылка на родительский интерфейс - просто назначение parent_interface_name
+            else:
+                parent_topic = classes.find_jstopic_by_href(topic.parent_interface_href, interfaces)
+                if parent_topic is None:
+                    logger.error(f"fix_jstopics_after_parsing(): Ошибка: не найден родительский интерфейс по ссылке '{topic.parent_interface_href}' для {topic}")
+                    continue
+
+                topic.parent_interface_name = parent_topic.own_name
+    logger.info(f"Исправлено свойств/методов с доназначенными parent_interface_href: {found_parent_interface_count}")
+
+    ### слияние объектов jstopics с одинаковыми именами
+    # у enums, например, "DrawingObjectTypeEnum"
+    # у классов, например, "ksrasterformatparam" - это "ksrasterformatparam.js", "ch1780194.js", "ck1888295.js", "ck1863757.js"
+    #
     # нельзя использовать `classes.filter_by_type()`, потому что она возвращает словарь, и там классы одного типа затираются
+    # обязательно после назначения `parent_interface_name`!
 
     names_and_topics: dict[str, list[Topic]] = find_non_unique_topics(jstopics)
 
+    merged_enums_count: int = 0
+    merged_classes_count: int = 0
     for name, topics_list in names_and_topics.items():
-        if len(topics_list) > 1:
-            for topic in topics_list:
-                logger.error(f"fix_jstopics_after_parsing(): Ошибка: объект jstopic с повторяющимся именем '{name}': {topic}")
+        topics_types = [t.page_type for t in topics_list]
+        if not len(topics_list) > 1:
+            continue
 
-    ### назначение родительских интерфейсов для страниц свойства/метода
+        if not all([topics_types[0] == tt for tt in topics_types]):
+            logger.error(f"fix_jstopics_after_parsing(): Ошибка: объекты jstopic имеют разные типы, но одинаковые имена {repr(name)}: {topics_list}")
+            continue
 
-    interfaces: list[Topic] = list(classes.filter_by_type(jstopics, HelpPageType.Interface).values())
-    fixed_count: int = 0
+        topic = topics_list[0]  # остающийся объект. Остальные - к удалению.
 
-    for topic in jstopics:
-        if topic.page_type == HelpPageType.PropertyOrMethod:
-            if topic.parent_interface_href == "":
-                logger.error(f"fix_jstopics_after_parsing(): Ошибка: нет ссылки на родительский интерфейс у {topic}")
+        for t in topics_list:
+            if t == topic: continue
+
+            topic.own_hrefs.extend(t.own_hrefs)
+            topic.docstring, biggest_doc_index = merge_docstrings(topic.docstring, t.docstring)
+
+            if topics_types[0] == HelpPageType.Enum:
+                merge_enum_members(topic.enum_members, t.enum_members)
+                merged_enums_count += 1
+
+            elif topics_types[0] == HelpPageType.Interface:
+                topic.hierarchy = (topic.hierarchy, t.hierarchy)[biggest_doc_index]
+                topic.example_href = (topic.example_href, t.example_href)[biggest_doc_index]
+                merged_classes_count += 1
+
+            else:
+                logger.error(f"fix_jstopics_after_parsing(): Ошибка: не предусмотрено слияние объектов с page_type={HelpPageType.str_from_int(topics_types[0])} у {topic}")
                 continue
 
-            parent_topic = classes.find_jstopic_by_href(topic.parent_interface_href, interfaces)
-            if parent_topic is None:
-                logger.error(f"fix_jstopics_after_parsing(): Ошибка: не найден родительский интерфейс по ссылке '{topic.parent_interface_href}' для {topic}")
-                continue
+            # topic.parent_interface_name =
+            # topic.parent_interface_href =
+            # topic.value_types =
+            # topic.breadcrumbs_links =
+            # topic.hmTitle =
+            # topic.hmBreadCrumbs =
 
-            topic.parent_interface_name = parent_topic.own_name
-            fixed_count += 1
+            jstopics.remove(t)
+            logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: удален объект jstopic вследствие слияния с одинаковым именем {repr(name)}: {t}, - слияние с {topic}")
 
-    ### слияние enums с одинаковыми именами
-
-    for name, topics_list in names_and_topics.items():
-        topics_types = [t.page_type == HelpPageType.Enum for t in topics_list]
-        if len(topics_list) > 1:
-            if not any(topics_types):
-                continue
-
-            if not all(topics_types):
-                logger.error(f"fix_jstopics_after_parsing(): Ошибка: объекты jstopic имеют разные типы, но одинаковые имена {repr(name)}: {topics_list}")
-                continue
-
-            topic = topics_list[0]  # остающийся объект. Остальные - к удалению.
-
-            for t in topics_list:
-                if t == topic: continue
-
-                _merge_enum_members(topic.enum_members, t.enum_members)
-
-                jstopics.remove(t)
-                logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: удален объект jstopic вследствие слияния enums с одинаковым именем {repr(name)}: {t}")
+    logger.info(f"Объединены перечисления (enums) с одинаковыми именами: {merged_enums_count}")
+    logger.info(f"Объединены классы с одинаковыми именами: {merged_classes_count}")
 
 
-    ### вывод объектов, у которых page_type == Unknown
+    # ### проверка на уникальность наименований (справочная) после всех возможных исправлений
 
-    for topic in jstopics:
-        if topic.page_type == HelpPageType.Unknown:
-            logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: остается объект jstopic с неизвестным типом страницы: {topic}")
+    # names_and_topics: dict[str, list[Topic]] = find_non_unique_topics(jstopics)
 
-    logger.info(f"Исправлены {fixed_count} объектов jstopic.")
+    # intersecting_names_count: int = 0
+    # for name, topics_list in names_and_topics.items():
+    #     if len(topics_list) > 1:
+    #         for topic in topics_list:
+    #             logger.error(f"fix_jstopics_after_parsing(): Ошибка: объект jstopic с повторяющимся именем '{name}': {topic}")
+    #             intersecting_names_count += 1
+    # logger.info(f"Исправлено объектов jstopic с повторяющимися именами: {intersecting_names_count}")
+
+
+    # ### вывод объектов, у которых page_type == Unknown
+    # не актуально, потому что такие вообще не возвращаются из parse_single_jstopic()
+
+    # unknown_count = 0
+    # for topic in jstopics:
+    #     if topic.page_type == HelpPageType.Unknown:
+    #         unknown_count += 1
+    #         logger.warning(f"fix_jstopics_after_parsing(): Предупреждение: остается объект jstopic с неизвестным типом страницы: {topic}")
+    # logger.info(f"Количество объектов jstopic с неизвестным типом страницы: {unknown_count}")
 
 
 def load_topics(filepath: str) -> list[Topic]:
@@ -1030,7 +1266,7 @@ def sort_topics_by_toc(toc_entries_list: list[TOCEntry], topics: typing.Iterable
 
     def _key(topic: Topic) -> int:
         try:
-            return toc_entries_hrefs.index(topic.own_href)
+            return toc_entries_hrefs.index(topic.own_hrefs[0])
         except ValueError:
             return 10 ** 9
 

@@ -1,10 +1,10 @@
 
-from win32com.client import gencache
+from win32com.client import gencache # type: ignore
 
 
 def get_Kompas6API5():
-    return gencache.EnsureModule("{0422828C-F174-495E-AC5D-D31014DBBE87}", 0, 1, 0)
+    return gencache.EnsureModule("{0422828C-F174-495E-AC5D-D31014DBBE87}", 0, 1, 0)  # type: ignore
 
 def get_KompasAPI7():
-    return gencache.EnsureModule("{69AC2981-37C0-4379-84FD-5DD2F3C0A520}", 0, 1, 0)
+    return gencache.EnsureModule("{69AC2981-37C0-4379-84FD-5DD2F3C0A520}", 0, 1, 0)  # type: ignore
 

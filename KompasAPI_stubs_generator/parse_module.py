@@ -50,7 +50,7 @@ from . import const
 from . import kompas_api_modules
 
 
-import pythoncom
+import pythoncom  # type: ignore
 PYTHONCOM_MISSING = pythoncom.Missing
 PYTHONCOM_EMPTY = pythoncom.Empty
 

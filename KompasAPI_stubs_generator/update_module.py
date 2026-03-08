@@ -30,7 +30,7 @@ from . import parse_topics
 
 
 
-KNOWN_TYPES_NAMES: list[str] = [c.__name__ for c in parse_module.KNOWN_TYPES]
+KNOWN_TYPES_NAMES: list[str] = [c.__name__ for c in parse_module.KNOWN_TYPES] + ["None"]
 
 
 
@@ -39,7 +39,7 @@ def update_property_or_method(
         topic: Topic,
         ) -> None:
     py_entry.doc = topic.docstring
-    py_entry.href = utils.ensure_ext(topic.own_href, ".html")
+    py_entry.hrefs = topic.own_hrefs.copy()
     if isinstance(py_entry, PythonFunction):  # метод
         pass
 
@@ -56,7 +56,7 @@ def update_class(
         entries_to_remove: typing.Container[str],
         ) -> None:
     py_entry.doc = topic.docstring
-    py_entry.href = utils.ensure_ext(topic.own_href, ".html")
+    py_entry.hrefs = topic.own_hrefs.copy()
 
     has_dispatch = CLASS_NAME_IDispatch in py_entry.base_classes
     py_entry.base_classes = topic.hierarchy[0].copy()
@@ -82,9 +82,9 @@ def update_pylibs_from_topics(
     contents: list[PythonEntry] = parse_module.load_pylib(pylib_raw_filepath)
     pylib_entries: dict[str, PythonEntry] = parse_module.get_entries(contents)
 
-    class_entry_topics = classes.filter_by_type(jstopics, HelpPageType.PropertyOrMethod)
-    interface_topics = classes.filter_by_type(jstopics, HelpPageType.Interface)
-    enum_topics = classes.filter_by_type(jstopics, HelpPageType.Enum)
+    class_entry_topics = classes.filter_by_type_as_dict(jstopics, HelpPageType.PropertyOrMethod)
+    interface_topics = classes.filter_by_type_as_dict(jstopics, HelpPageType.Interface)
+    enum_topics = classes.filter_by_type_as_dict(jstopics, HelpPageType.Enum)
 
     logger.info(f"Количество объектов class_entry_topics: {len(class_entry_topics)}")
     logger.info(f"Количество объектов   interface_topics: {len(interface_topics)}")
@@ -95,7 +95,7 @@ def update_pylibs_from_topics(
 
     logger.info(f"Получение перечней свойств/методов в родительских классах...")
     classes_children: dict[str, list[str]] = {
-        CLASS_NAME_IDispatch: [],
+        classes.get_py_entry_full_name(CLASS_NAME_IDispatch, None): [],
     }
     for name, py_class in pylib_entries.items():
         if isinstance(py_class, PythonClass):
@@ -115,15 +115,15 @@ def update_pylibs_from_topics(
     count: int = 0
 
     for name, topic in class_entry_topics.items():
-        logger.debug(f"{name} для '{topic.own_name}'")
-        if not name in pylib_entries:
-            logger.warning(f"update_pylibs_from_topics(): Предупреждение: не найдено имя среди pylib_entries: '{name}' у {topic}")
+        py_entry: PythonEntry|None = pylib_entries.get(name, None)
+        if py_entry is None:
+            # # не надо писать, потому что среди topics есть PythonEntries вообще всего подряд (и KAPI5, и KAPI7, и constants)
+            # logger.warning(f"update_pylibs_from_topics(): Предупреждение: не найдено имя среди pylib_entries: '{name}' у {topic}")
             continue
 
-        py_entry: PythonEntry = pylib_entries[name]
+        logger.debug(f"update_pylibs_from_topics(): Обновление свойства/метода '{name}', topic={topic}")
 
         update_property_or_method(py_entry, topic)
-
 
         ### определение типа возвращаемого значения метода или типа свойства
 
@@ -132,6 +132,7 @@ def update_pylibs_from_topics(
 
             def _filter_return_types(return_types: typing.Iterable[str]):
                 filtered_types: list[str] = []
+                any_type_name = parse_topics.ANY_TYPE_NAME.lower() if classes.DO_USE_LOWERCASE_NAMES else parse_topics.ANY_TYPE_NAME
 
                 for return_type in return_types:
                     return_type_to_search = return_type.lower() if classes.DO_USE_LOWERCASE_NAMES else return_type
@@ -150,7 +151,7 @@ def update_pylibs_from_topics(
                         filtered_types.append("int")
                         continue
 
-                    if return_type_to_search == parse_topics.ANY_TYPE_NAME:
+                    if return_type_to_search == any_type_name:
                         filtered_types.append("typing.Any")
                         continue
 
@@ -188,7 +189,7 @@ def update_pylibs_from_topics(
             return_type = "|".join(_filter_return_types(topic.value_types["return"].split("|")))
 
             if return_type != "":
-                logger.debug(f"\tвозвращаемое значение: {return_type}")
+                logger.debug(f"update_pylibs_from_topics(): возвращаемое значение: '{return_type}' у '{name}'")
                 if isinstance(py_entry, PythonFunction):
                     py_entry.return_type = return_type
                 if isinstance(py_entry, PythonVariable):
@@ -205,14 +206,15 @@ def update_pylibs_from_topics(
     count: int = 0
 
     for name, topic in interface_topics.items():
-        logger.debug(f"{name} для '{topic.own_name}'")
+        logger.debug(f"update_pylibs_from_topics(): Обновление класса '{name}' для '{topic.own_name}'")
         if not name in pylib_entries:
-            logger.error(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди pylib_entries: '{name}' у {topic}")
+            # # не надо писать, потому что среди topics есть PythonEntries вообще всего подряд (и KAPI5, и KAPI7, и constants)
+            # logger.error(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди pylib_entries: '{name}' у {topic}")
             continue
 
         py_class = pylib_entries[name]
         if not isinstance(py_class, PythonClass):
-            logger.error(f"update_pylibs_from_topics(): Ошибка: объект '{name}' не является объектом класса PythonClass у {topic}")
+            logger.error(f"update_pylibs_from_topics(): Ошибка: объект '{name}' не является объектом класса PythonClass")
             continue
 
         entries_to_remove: set[str] = set()
@@ -238,13 +240,18 @@ def update_pylibs_from_topics(
     parse_module.write_pylib_update(pylib_updated_filepath, contents)
 
 
-    ### проверка (сообщение об) py_entries без документации
+    ### вывод перечня py_entries без документации
 
-    # undocumented_entries: list[PythonEntry] = []
+    # список формируется заново, так как выше были удалены entries (в частности, из PythonClass.children)
+    pylib_entries: dict[str, PythonEntry] = parse_module.get_entries(contents)
 
+    undocumented_count: int = 0
     for name, py_entry in pylib_entries.items():
         if py_entry.doc == "":
-            logger.warning(f"update_pylibs_from_topics(): Предупреждение: Объект py_entry без документации: {repr(name)} для {repr(py_entry.name)}, href='{py_entry.href}'")
+            logger.warning(f"update_pylibs_from_topics(): Предупреждение: Объект py_entry без документации: {repr(name)} для {repr(py_entry.name)}, href='{py_entry.hrefs}'")
+            undocumented_count += 1
+    logger.info(f"Количество объектов py_entry без документации: {undocumented_count}")
+
 
 
 def main(

@@ -24,6 +24,8 @@ from .classes import ENUM_UNNAMED
 
 from .utils.utils import indent, render_docstring
 
+from .generate_stub import render_hrefs
+
 
 def render_enum(topic: Topic) -> str:
     output: str = ""
@@ -37,7 +39,7 @@ def render_enum(topic: Topic) -> str:
         s_doc = render_docstring(member_docstring) + "\n" if member_docstring != "" else ""
         output += f"{name.ljust(max_name_width)} = {value}\n{s_doc}"
 
-    s_href = f"  # {utils.ensure_ext(topic.own_href, '.html')}" if topic.own_href != "" else ""
+    s_href = render_hrefs(topic.own_hrefs, True)
 
     if topic.own_name != ENUM_UNNAMED:
         s_doc = render_docstring(topic.docstring) + "\n" if topic.docstring != "" else ""
@@ -55,8 +57,8 @@ def generate_constants(jstopics: list[Topic]) -> str:
     output: str = ""
 
     for topic in enum_topics:
-        logger.debug(f"{topic}")
-        output += render_enum(topic)
+        logger.debug(f"generate_constants(): Рендеринг перечисления {topic}")
+        output += render_enum(topic) + "\n"
 
     return output
 

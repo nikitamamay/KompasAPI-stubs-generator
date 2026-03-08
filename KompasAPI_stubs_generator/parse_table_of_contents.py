@@ -84,7 +84,7 @@ def parse_toc_entry(
         if isinstance(child_d, dict):
             toc_entry.children.append(parse_toc_entry(child_d, debug_print_indent_level + 1))
         else:
-            logger.debug(f"parse_toc_entry(): Ошибка: ожидается словарь: {repr(child_d)}")
+            logger.error(f"parse_toc_entry(): Ошибка: ожидается словарь вместо {repr(child_d)}")
     return toc_entry
 
 

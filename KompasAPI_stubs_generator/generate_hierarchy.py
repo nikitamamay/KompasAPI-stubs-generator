@@ -40,21 +40,20 @@ def generate_hierarchy(interfaces: typing.Iterable[Topic]) -> dict[str, list[str
     logger.info(f"Генерация иерархии (перечня прямых родителей)...")
 
     for topic in interfaces:
-        cn: str = topic.own_name
-        logger.debug(f"{cn}")
-
-        if cn == "":
+        if topic.own_name == "":
             logger.error(f"generate_hierarchy(): Ошибка: Пустое own_name у {topic}")
             continue
 
-        if cn in KompasAPIclassesHierarchy:
-            logger.warning(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy, для '{cn}'")
+        if topic.own_name in KompasAPIclassesHierarchy:
+            logger.warning(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy: '{topic.own_name}'")
             continue
+
+        logger.debug(f"generate_hierarchy(): Иерархия для '{topic.own_name}': {topic.hierarchy[0]}")
 
         # assert len(topic.hierarchy) > 1, f"Ошибка: Пустая иерархия у {topic}: {repr(topic.hierarchy)}"
         base_classes: list[str] = topic.hierarchy[0]
 
-        KompasAPIclassesHierarchy[cn] = base_classes.copy()
+        KompasAPIclassesHierarchy[topic.own_name] = base_classes.copy()
 
     logger.info(f"Сформирована иерархия (перечень прямых родителей) для {len(KompasAPIclassesHierarchy)} классов.")
     return KompasAPIclassesHierarchy
@@ -81,7 +80,7 @@ def generate_and_write_hierarchy(
         KompasAPIclassesHierarchy_file: str,
         ) -> None:
 
-    interfaces: list[Topic] = list(classes.filter_by_type(jstopics, HelpPageType.Interface).values())
+    interfaces: list[Topic] = classes.filter_by_type(jstopics, HelpPageType.Interface)
     logger.info(f"Загружено {len(interfaces)} классов интерфейсов.")
 
     KompasAPIclassesHierarchy = generate_hierarchy(interfaces)
