@@ -36,7 +36,10 @@ def generate_pyi_general(py_entry: PythonEntry) -> str:
     elif isinstance(py_entry, PythonFunction):
         output += generate_pyi_function(py_entry) + "\n"
 
-    elif isinstance(py_entry, (PythonVariable, PythonProperty)):
+    elif isinstance(py_entry, PythonProperty):  # эта проверка должна быть раньше, чем на PythonVariable
+        output += generate_pyi_property(py_entry) + "\n"
+
+    elif isinstance(py_entry, PythonVariable):
         output += generate_pyi_simple_value(py_entry) + "\n"
 
     else:
@@ -74,7 +77,38 @@ def generate_pyi_simple_value(py_entry: PythonVariable) -> str:
     return f"{py_entry.name}{s_type} = {py_entry.value}{s_href}\n{s_doc}"
 
 
-def generate_pyi_function(py_entry: PythonFunction):
+def generate_pyi_property(py_entry: PythonProperty) -> str:
+    if not py_entry.has_getter:
+        logger.debug(f"generate_pyi_property(): Предупреждение: отсутствует getter у {py_entry}")
+        # но getter всё равно будет создан, потому что так устроен декоратор @property в Python.
+
+    output: str = ""
+
+    s_doc: str = ""
+    s_type_getter: str = ""
+    s_type_setter: str = ""
+    s_href: str = ""
+
+    if py_entry.value_type != "":
+        s_type_setter = f": {py_entry.value_type}"
+        s_type_getter = f" -> {py_entry.value_type}" if py_entry.has_getter else f" -> typing.NoReturn"
+
+    if py_entry.doc != "":
+        s_doc = f"{render_docstring(py_entry.doc)}\n"
+
+    s_href = utils.render_hrefs(py_entry.hrefs, True)
+
+    # getter
+    output += f"@property\ndef {py_entry.name}(self){s_type_getter}:{s_href}\n{indent(s_doc)}{indent('...')}\n"
+
+    # setter
+    if py_entry.has_setter:
+        output += f"@{py_entry.name}.setter\ndef {py_entry.name}(self, value{s_type_setter}): ...\n"
+
+    return output
+
+
+def generate_pyi_function(py_entry: PythonFunction) -> str:
     s_name: str = py_entry.name
     s_params: str = ""
     s_return_type: str = ""

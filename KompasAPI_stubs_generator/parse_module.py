@@ -109,24 +109,27 @@ def is_class_key_ignored(key: str) -> bool:
     return False
 
 
-def parse_general(key: str, value: typing.Any, is_class_entry: bool = False) -> PythonEntry:
+def parse_general(key: str, value: typing.Any, parent_entry: PythonEntry|None = None) -> PythonEntry:
     value_type = type(value)
 
     if value_type == type:
-        return parse_class(value)
+        return parse_class(value, parent_entry)
 
     elif value_type == types.FunctionType:
-        return repr_function(value, is_class_entry)
+        return parse_function(value, parent_entry)
 
     elif value_type in KNOWN_TYPES:
-        return repr_simple_value(key, value, is_class_entry)
+        return parse_simple_value(key, value, parent_entry)
 
-    return repr_simple_value(key, value, is_class_entry)
+    else:
+        return parse_simple_value(key, value, parent_entry)
 
 
-def repr_simple_value(key: str, value: typing.Any, is_class_entry: bool = False) -> PythonVariable:
+def parse_simple_value(key: str, value: typing.Any, parent_entry: PythonEntry|None = None) -> PythonVariable:
     py_var = PythonVariable()
     py_var.name = key
+    py_var.full_name = classes.get_py_entry_full_name(py_var.name, parent_entry)
+
     if value is None:
         py_var.value_type = ""
         py_var.value = "None"
@@ -138,9 +141,10 @@ def repr_simple_value(key: str, value: typing.Any, is_class_entry: bool = False)
     return py_var
 
 
-def repr_function(func: types.FunctionType, is_class_entry: bool = False):
+def parse_function(func: types.FunctionType, parent_entry: PythonEntry|None = None):
     py_func = PythonFunction()
     py_func.name = func.__name__
+    py_func.full_name = classes.get_py_entry_full_name(py_func.name, parent_entry)
 
     params = func.__code__.co_varnames[:func.__code__.co_argcount]
 
@@ -157,10 +161,17 @@ def repr_function(func: types.FunctionType, is_class_entry: bool = False):
 
     return py_func
 
+def parse_property(prop_name: str, parent_entry: PythonClass) -> PythonProperty:
+    prop = PythonProperty()
+    prop.name = prop_name
+    prop.full_name = classes.get_py_entry_full_name(prop_name, parent_entry.full_name)
+    return prop
 
-def parse_class(cls_: type) -> PythonClass:
+
+def parse_class(cls_: type, parent_entry: PythonEntry|None = None) -> PythonClass:
     py_class = PythonClass()
     py_class.name = cls_.__name__
+    py_class.full_name = classes.get_py_entry_full_name(py_class.name, parent_entry)
 
     if cls_.__base__ is not None:
         if cls_.__base__ == object:
@@ -170,29 +181,47 @@ def parse_class(cls_: type) -> PythonClass:
         else:
             logger.warning(f"parse_class(): Неизвестный родительский класс: {repr(cls_.__base__.__name__)} у '{py_class.name}'")
 
+    ### парсинг свойств класса
+
     cls_vars = vars(cls_)
     properties: dict[str, PythonProperty] = {}
 
     if "_prop_map_get_" in cls_vars:
         for prop_name in cls_vars["_prop_map_get_"].keys():
             if not prop_name in properties:
-                properties[prop_name] = PythonProperty()
-                properties[prop_name].name = prop_name
+                properties[prop_name] = parse_property(prop_name, py_class)
             properties[prop_name].has_getter = True
 
     if "_prop_map_put_" in cls_vars:
         for prop_name in cls_vars["_prop_map_put_"].keys():
             if not prop_name in properties:
-                properties[prop_name] = PythonProperty()
-                properties[prop_name].name = prop_name
+                properties[prop_name] = parse_property(prop_name, py_class)
             properties[prop_name].has_setter = True
 
     py_class.children.extend(properties.values())
 
+    ### парсинг методов и переменных класса
+
     for key, value in cls_vars.items():
         if is_class_key_ignored(key):
             continue
-        py_class.children.append(parse_general(key, value, is_class_entry=True))
+        py_class.children.append(parse_general(key, value, py_class))
+
+    ### удаление свойства класса, если есть метод с таким же именем
+    # актуально для "ipropertylinkbutton_buttonvisible.js" и др.:
+    # в python-модуле есть указание в _prop_map_get_ и _prop_map_put_ о свойстве
+    # и в то же время есть метод с таким же именем.
+    # на самом деле это "свойство" считывается методом ButtonVisible(self, btnId: int)
+    # и устанавливается методом SetButtonVisible(self, btnId: int, state: bool)
+
+    properties_to_remove: list[PythonProperty] = []
+    for child_entry in py_class.children:
+        if isinstance(child_entry, PythonFunction):
+            if child_entry.name in properties:
+                properties_to_remove.append(properties[child_entry.name])
+    for p in properties_to_remove:
+        py_class.children.remove(p)
+        logger.debug(f"parse_class(): Удаление свойства, так как его имя пересекается с именем метода: {p}")
 
     return py_class
 

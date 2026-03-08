@@ -33,13 +33,19 @@ from . import parse_topics
 KNOWN_TYPES_NAMES: list[str] = [c.__name__ for c in parse_module.KNOWN_TYPES] + ["None"]
 
 
-
-def update_property_or_method(
+def update_python_entry(
         py_entry: PythonEntry,
         topic: Topic,
         ) -> None:
     py_entry.doc = topic.docstring
     py_entry.hrefs = topic.own_hrefs.copy()
+
+
+def update_property_or_method(
+        py_entry: PythonEntry,
+        topic: Topic,
+        ) -> None:
+    update_python_entry(py_entry, topic)
     if isinstance(py_entry, PythonFunction):  # метод
         pass
 
@@ -55,15 +61,13 @@ def update_class(
         topic: Topic,
         entries_to_remove: typing.Container[str],
         ) -> None:
-    py_entry.doc = topic.docstring
-    py_entry.hrefs = topic.own_hrefs.copy()
+    update_python_entry(py_entry, topic)
 
-    has_dispatch = CLASS_NAME_IDispatch in py_entry.base_classes
-    py_entry.base_classes = topic.hierarchy[0].copy()
-    if len(py_entry.base_classes) == 0 and has_dispatch:
-        py_entry.base_classes.append(CLASS_NAME_IDispatch)
+    # обновление иерархии (родительского класса):
+    # если иерархия в topic пустая, то остается то, что было получено в parse_module()
+    if len(topic.hierarchy[0]) > 0:
+        py_entry.base_classes = topic.hierarchy[0].copy()
 
-    # TODO удалить свойства, которые уже были объявлены в base_classes
     i = 0
     while i < len(py_entry.children):
         e: PythonEntry = py_entry.children[i]
@@ -217,6 +221,7 @@ def update_pylibs_from_topics(
             logger.error(f"update_pylibs_from_topics(): Ошибка: объект '{name}' не является объектом класса PythonClass")
             continue
 
+        # формирование перечня методов/свойств, которые уже есть в родительских классах - на удаление в текущем классе
         entries_to_remove: set[str] = set()
         for cls_name in topic.hierarchy[0]:
             cls_name = classes.get_py_entry_full_name(cls_name, None)
@@ -230,11 +235,6 @@ def update_pylibs_from_topics(
 
     logger.info(f"Обновлены {count} классов.")
 
-    ### обновление enums
-
-
-
-
     ### запись
 
     parse_module.write_pylib_update(pylib_updated_filepath, contents)
@@ -242,7 +242,7 @@ def update_pylibs_from_topics(
 
     ### вывод перечня py_entries без документации
 
-    # список формируется заново, так как выше были удалены entries (в частности, из PythonClass.children)
+    # список формируется заново, так как выше были удалены entries (методы/свойства, принадлежащие родительским классам) у классов
     pylib_entries: dict[str, PythonEntry] = parse_module.get_entries(contents)
 
     undocumented_count: int = 0

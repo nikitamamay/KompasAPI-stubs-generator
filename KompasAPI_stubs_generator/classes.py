@@ -130,6 +130,13 @@ class PythonEntry(json_utils.JSONable):
         self.doc: str = ""
         self.hrefs: list[str] = [""]
         """ Ссылки на страницы Справки. Должны быть с расширением `.js` """
+        self.full_name: str = ""
+
+    def __repr__(self) -> str:
+        return f"<{self.__class__.__name__} full_name={repr(self.full_name)}, hrefs={repr(self.hrefs)}>"
+
+    __str__ = __repr__
+
 
 class PythonClass(PythonEntry):
     def __init__(self) -> None:
