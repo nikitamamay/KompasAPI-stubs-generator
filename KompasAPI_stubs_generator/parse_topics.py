@@ -164,14 +164,29 @@ def search_identifier(text: str, do_match: bool = False) -> str:
     return utils.ensure_latin(m.group(0))
 
 
-def extract_subsections_hrefs(soup: Tag) -> None:
-    toc_title_tags = soup.find_all("p", attrs={"class": "p_Z_LOC_TOC_Title"})
-    for toc_title_tag in toc_title_tags:
-        toc_title_tag.extract()
+def extract_subsections_hrefs(body: Tag) -> None:
+    tags_to_remove: list[Tag] = []
 
-    toc_entry_tags = soup.find_all("p", attrs={"class": "p_Z_LOC_TOC"})
-    for toc_entry_tag in toc_entry_tags:
-        toc_entry_tag = toc_entry_tag.extract()
+    tags_to_remove.extend(body.find_all("p", attrs={"class": "p_Z_LOC_TOC_Title"}))
+    tags_to_remove.extend(body.find_all("p", attrs={"class": "p_Z_LOC_TOC"}))
+
+    for tag in tags_to_remove:
+        tag.extract()
+
+
+def extract_picture(body: Tag) -> bool:
+    tags_to_remove: list[Tag] = []
+
+    tags_to_remove.extend(body.find_all("p", attrs= { "class": "p_Picture_Title" }))
+
+    # нельзя просто удалить div или table, который содержит img.
+    # Есть случаи, где картинка помещена внутрь полезной таблицы: "ksdocument2d_ksannpoint.js"
+    tags_to_remove.extend(body.find_all("img"))
+
+    for tag in tags_to_remove:
+        tag.extract()
+
+    return len(tags_to_remove) > 0
 
 
 def parse_tag_text_to_single_line(tag: Tag) -> str:
@@ -227,6 +242,11 @@ def render_table(
             for line in cell.splitlines(False):
                 column_widths[j] = max(column_widths[j], len(line))
 
+    ### если пустая таблица
+
+    if sum(column_widths) == 0:
+        return ""
+
     ### отрисовка таблицы
 
     string: str = ""
@@ -269,23 +289,30 @@ def parse_description_table(
 
     if section in (DescriptionSection.SyntaxAutomation, DescriptionSection.SyntaxCOM):
         # для таблиц о синтаксисе [свойства объекта класса] содержимое вписывается просто в виде текста.
+
         # Если во второй ячейки строки найдены "**" (второй вариант синтаксиса для языков без свойства
         # - а в Python годится первый), то строка пропускается целиком.
-
-        to_extract: list[Tag] = []
-        for tr_tag in table_tag.find_all("tr"):
-            m = re_stars_in_brackets.search(tr_tag.get_text())
-            if m is not None:
-                if m.group(2) == "**":
-                    to_extract.append(tr_tag)
-        for tag in to_extract:
-            tag.extract()
+        #
+        # Пусть указания о синтаксисе с двумя звездочками "(**)" останутся, так как они иногда правдивы.
+        # Оказывается, в Python-модулях API бывает так, что указано свойство в _prop_map_get_ и _prop_map_put_,
+        # и при этом есть еще и метод с тем же названием. Это приводит к пересечению названий при generate_stub.
+        #
+        # to_extract: list[Tag] = []
+        # for tr_tag in table_tag.find_all("tr"):
+        #     m = re_stars_in_brackets.search(tr_tag.get_text())
+        #     if m is not None:
+        #         if m.group(2) == "**":
+        #             to_extract.append(tr_tag)
+        # for tag in to_extract:
+        #     tag.extract()
 
         output += render_table(table_tag, False, lambda: _vertical_borders_comments())
         output = re_stars_in_brackets.subn("", output)[0]
 
     else:
-        output += render_table(table_tag) + "\n"
+        s_table = render_table(table_tag)
+        if s_table != "":  # может быть пустой строкой, если произошел парсинг таблицы из одной строки и одной ячейки без текста, где была картинка
+            output += s_table + "\n"
 
     return output
 
@@ -869,6 +896,10 @@ def parse_single_jstopic(
         # удаление комментариев
         for tag in body.find_all(string=lambda text: isinstance(text, Comment)):
             tag.extract()
+
+        # удаление таблицы с картинкой и абзаца подписи картинки
+        if extract_picture(body):
+            logger.debug(f"parse_single_jstopic(): убрана картинка со страницы '{own_href}'")
 
         ### здесь body готов для парсинга человекочитаемого description
 
