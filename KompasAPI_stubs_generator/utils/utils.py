@@ -133,7 +133,8 @@ def write_python_module(filepath: str, content: str) -> int:
         size += f.write(
             f"#\n" \
             f"# File '{os.path.split(os.path.abspath(filepath))[1]}'\n" \
-            f"# generated automatically on {get_now_datetime_str()}\n" \
+            f"# is generated automatically on {get_now_datetime_str()}\n" \
+            f"# by 'https://github.com/nikitamamay/KompasAPI-stubs-generator'\n" \
             f"#\n" \
             f"\n" \
             f"\n" \
@@ -153,3 +154,10 @@ def ensure_latin(text: str) -> str:
     return text
 
 
+def render_hrefs(hrefs: list[str], as_comment: bool) -> str:
+    if len(hrefs) == 0 or hrefs[0] == "":
+        return ""
+    s_hrefs = ", ".join([ensure_ext(h, ".html") for h in hrefs])
+    if as_comment and s_hrefs != "":
+        return f"  # {s_hrefs}"
+    return s_hrefs

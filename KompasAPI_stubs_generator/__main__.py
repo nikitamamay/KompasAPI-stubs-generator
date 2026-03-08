@@ -139,13 +139,6 @@ logger = logging_system.get_logger(__name__)
 
 const.init_filepaths()
 
-# проверка на правильность указания пути к папке SDK
-if not const.is_sdk_dir_correct():
-    print(f"Неверно указан путь к папке Справки SDK Компас: '{const._SDK_HELP_DIR_PATH}'")
-    print(f"Не использован флаг '--sdk-dir=' ?")
-    print(f"\nИспользуйте флаг '--help' для вывода справки.")
-    sys.exit(1)
-
 
 ### main
 # импорты после парсинга аргументов, потому что при импортах сразу создается Logger, а опцией CLI `--log=...` может задаваться его уровень логгирования.

@@ -27,15 +27,6 @@ from .classes import sort_py_entries
 
 
 
-def render_hrefs(hrefs: list[str], as_comment: bool) -> str:
-    if len(hrefs) == 0 or hrefs[0] == "":
-        return ""
-    s_hrefs = ", ".join([utils.ensure_ext(h, ".html") for h in hrefs])
-    if as_comment and s_hrefs != "":
-        return f"  # {s_hrefs}"
-    return s_hrefs
-
-
 def generate_pyi_general(py_entry: PythonEntry) -> str:
     output: str = ""
 
@@ -62,7 +53,7 @@ def generate_pyi_unknown_entry(py_entry: PythonEntry) -> str:
     if py_entry.doc != "":
         s_doc = f"{render_docstring(py_entry.doc)}\n"
 
-    s_href = render_hrefs(py_entry.hrefs, True)
+    s_href = utils.render_hrefs(py_entry.hrefs, True)
 
     return f"{py_entry.name} = ...{s_href}\n{s_doc}"
 
@@ -78,7 +69,7 @@ def generate_pyi_simple_value(py_entry: PythonVariable) -> str:
     if py_entry.doc != "":
         s_doc = f"{render_docstring(py_entry.doc)}\n"
 
-    s_href = render_hrefs(py_entry.hrefs, True)
+    s_href = utils.render_hrefs(py_entry.hrefs, True)
 
     return f"{py_entry.name}{s_type} = {py_entry.value}{s_href}\n{s_doc}"
 
@@ -98,7 +89,7 @@ def generate_pyi_function(py_entry: PythonFunction):
     if py_entry.doc != "":
         s_doc = f"{render_docstring(py_entry.doc)}\n"
 
-    s_href = render_hrefs(py_entry.hrefs, True)
+    s_href = utils.render_hrefs(py_entry.hrefs, True)
 
     return f"def {s_name}({s_params}){s_return_type}:{s_href}\n{indent(s_doc)}{indent('...')}\n"
 
@@ -128,7 +119,7 @@ def generate_pyi_class(py_entry: PythonClass) -> str:
     if output == "":  # когда нет ни одного дочернего элемента в классе, например, IBreakAngleDimension
         output = "..."
 
-    s_href = render_hrefs(py_entry.hrefs, True)
+    s_href = utils.render_hrefs(py_entry.hrefs, True)
 
     return f"class {py_entry.name}({s_base_classes}):{s_href}\n{indent(s_doc)}{indent(output)}\n"
 

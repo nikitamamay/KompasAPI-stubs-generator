@@ -24,87 +24,108 @@ from .utils import utils
 
 
 from . import parse_topics
+from . import parse_module
+
 from . import classes
-from .classes import HelpPageType, Topic
+from .classes import HelpPageType, Topic, TOCEntry, \
+    PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty
 from .classes import CLASS_NAME_IDispatch
 
 
 from .utils.utils import PYTHON_TAB
 
 
+HIERARCHY_VARIABLE_NAME = "KompasAPIclassesHierarchy"
+HIERARCHY_VARIABLE_TYPE: typing.TypeAlias = dict[str, list[str]]
 
-def generate_hierarchy(interfaces: typing.Iterable[Topic]) -> dict[str, list[str]]:
-    KompasAPIclassesHierarchy: dict[str, list[str]] = {
-        CLASS_NAME_IDispatch: [],
-    }
+
+
+def generate_hierarchy(interfaces: typing.Iterable[PythonClass]) -> str:
+    content: str = ""
+
     logger.info(f"Генерация иерархии (перечня прямых родителей)...")
 
-    for topic in interfaces:
-        if topic.own_name == "":
-            logger.error(f"generate_hierarchy(): Ошибка: Пустое own_name у {topic}")
+    name_max_width: int = 0
+    value_max_width: int = 0
+
+    hierarchy_dict: dict[str, tuple[str, str]] = {
+        CLASS_NAME_IDispatch: ("[]", ""),
+    }
+    """ Словарь: `{ class_name: ( base_classes, s_href ), ... }` """
+
+    for py_entry in interfaces:
+        if py_entry.name in hierarchy_dict:
+            logger.warning(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy: '{py_entry.name}'")
             continue
 
-        if topic.own_name in KompasAPIclassesHierarchy:
-            logger.warning(f"generate_hierarchy(): Предупреждение: пропуск, так как уже есть в KompasAPIclassesHierarchy: '{topic.own_name}'")
-            continue
+        logger.debug(f"generate_hierarchy(): Иерархия для '{py_entry.name}': {py_entry.base_classes}")
 
-        logger.debug(f"generate_hierarchy(): Иерархия для '{topic.own_name}': {topic.hierarchy[0]}")
+        base_classes: list[str] = py_entry.base_classes.copy()
+        s_classes: str = repr(base_classes)
+        s_href: str = utils.render_hrefs(py_entry.hrefs, True)
 
-        # assert len(topic.hierarchy) > 1, f"Ошибка: Пустая иерархия у {topic}: {repr(topic.hierarchy)}"
-        base_classes: list[str] = topic.hierarchy[0]
+        hierarchy_dict[py_entry.name] = (s_classes, s_href)
+        name_max_width = max(name_max_width, len(py_entry.name))
+        value_max_width = max(value_max_width, len(s_classes))
 
-        KompasAPIclassesHierarchy[topic.own_name] = base_classes.copy()
+    logger.info(f"Сформирована иерархия (перечень прямых родителей) для {len(hierarchy_dict)} классов.")
 
-    logger.info(f"Сформирована иерархия (перечень прямых родителей) для {len(KompasAPIclassesHierarchy)} классов.")
-    return KompasAPIclassesHierarchy
+    name_max_width += 2  # +2, потому что кавычки
+    value_max_width += 1  # +1, потому что запятая
 
+    for name, value in hierarchy_dict.items():
+        s_classes, s_href = value
+        s_classes += ","
+        content += f'{PYTHON_TAB}{repr(name).ljust(name_max_width)}: {s_classes.ljust(value_max_width)}{s_href}\n'
 
-def write_hierarchy(filepath: str, KompasAPIclassesHierarchy: dict[str, list[str]]) -> None:
-    content: str = ""
-    content += f"KompasAPIclassesHierarchy: dict[str, list[str]] = {{\n"
+    content = f"{HIERARCHY_VARIABLE_NAME}: {str(HIERARCHY_VARIABLE_TYPE)} = {{\n{content}}}\n"
 
-    max_width: int = max(map(len, KompasAPIclassesHierarchy.keys())) + 2  # +2, потому что кавычки
-
-    for key, value in KompasAPIclassesHierarchy.items():
-        content += f'{PYTHON_TAB}{repr(key).ljust(max_width)}: {repr(value)},\n'
-
-    content += f"}}\n"
-
-    size = utils.write_python_module(filepath, content)
-
-    logger.info(f"Иерархия классов записана в '{filepath}' ({size} bytes).")
+    return content
 
 
 def generate_and_write_hierarchy(
-        jstopics: list[Topic],
+        py_entries: list[PythonEntry],
         KompasAPIclassesHierarchy_file: str,
         ) -> None:
 
-    interfaces: list[Topic] = classes.filter_by_type(jstopics, HelpPageType.Interface)
+    interfaces: list[PythonClass] = list(filter(
+        lambda e: isinstance(e, PythonClass),
+        py_entries,
+    ))  # type: ignore
     logger.info(f"Загружено {len(interfaces)} классов интерфейсов.")
 
-    KompasAPIclassesHierarchy = generate_hierarchy(interfaces)
-    write_hierarchy(KompasAPIclassesHierarchy_file, KompasAPIclassesHierarchy)
+    content: str = generate_hierarchy(interfaces)
+
+    size = utils.write_python_module(KompasAPIclassesHierarchy_file, content)
+    logger.info(f"Иерархия классов записана в '{KompasAPIclassesHierarchy_file}' ({size} bytes).")
 
 
 def load_hierarchy_python(
         KompasAPIclassesHierarchy_file: str,
-        ) -> dict[str,list[str]]:
-    KompasAPIclassesHierarchy: dict[str,list[str]] = utils.import_python_module_by_filepath(
-        KompasAPIclassesHierarchy_file
-        ).KompasAPIclassesHierarchy
+        ) -> HIERARCHY_VARIABLE_TYPE:
+    KompasAPIclassesHierarchy: HIERARCHY_VARIABLE_TYPE = getattr(
+        utils.import_python_module_by_filepath(KompasAPIclassesHierarchy_file),
+        HIERARCHY_VARIABLE_NAME,
+    )
     logger.info(f"Загружена иерархия для {len(KompasAPIclassesHierarchy)} классов КомпасAPI из файла '{KompasAPIclassesHierarchy_file}'.")
     return KompasAPIclassesHierarchy
 
 
 def main(
-        # do_k5: bool = True,
-        # do_k7: bool = True,
+        do_k5: bool = True,
+        do_k7: bool = True,
         ) -> None:
-    topics: list[Topic] = []
-    topics.extend(parse_topics.load_topics(const.get_topics_filepath()))
+    # topics: list[Topic] = []
+    # topics.extend(parse_topics.load_topics(const.get_topics_filepath()))
 
-    generate_and_write_hierarchy(topics, const.get_KompasAPIclassesHierarchy_file())
+    py_entries: list[PythonEntry] = []
+
+    if do_k5:
+        py_entries.extend(parse_module.load_pylib(const.get_pylib_K6API5_filepath_updated()))
+    if do_k7:
+        py_entries.extend(parse_module.load_pylib(const.get_pylib_KAPI7_filepath_updated()))
+
+    generate_and_write_hierarchy(py_entries, const.get_KompasAPIclassesHierarchy_file())
 
 
 

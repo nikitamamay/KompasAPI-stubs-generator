@@ -5,6 +5,7 @@
 
 """
 
+import sys
 import os
 
 
@@ -49,6 +50,13 @@ def set_sdk_help_dir(sdk_help_dir_path: str) -> None:
 
 def is_sdk_dir_correct() -> bool:
     return os.path.isdir(_SDK_HELP_DIR_PATH)
+
+def ensure_sdk_dir_is_correct() -> None:
+    if not is_sdk_dir_correct():
+        print(f"Неверно указан путь к папке Справки SDK Компас: '{_SDK_HELP_DIR_PATH}'")
+        print(f"Не использован флаг '--sdk-dir=' ?")
+        print(f"\nИспользуйте флаг '--help' для вывода справки.")
+        sys.exit(1)
 
 
 def init_filepaths():
@@ -97,12 +105,12 @@ module_K6API5_tail = "Kompas6API5.py"
 
 
 def get_hmcontent_js_filepath() -> str:
-    if not is_sdk_dir_correct(): raise Exception(f"Неверно указан путь к папке Справки SDK Компас: '{_SDK_HELP_DIR_PATH}'")
+    ensure_sdk_dir_is_correct()
     if not _are_filepaths_initialized: raise Exception(f"Filepaths are not initialized!")
     return _hmcontent_js_filepath
 
 def get_jstopics_dir() -> str:
-    if not is_sdk_dir_correct(): raise Exception(f"Неверно указан путь к папке Справки SDK Компас: '{_SDK_HELP_DIR_PATH}'")
+    ensure_sdk_dir_is_correct()
     if not _are_filepaths_initialized: raise Exception(f"Filepaths are not initialized!")
     return _jstopics_dir
 

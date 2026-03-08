@@ -24,8 +24,6 @@ from .classes import ENUM_UNNAMED
 
 from .utils.utils import indent, render_docstring
 
-from .generate_stub import render_hrefs
-
 
 def render_enum(topic: Topic) -> str:
     output: str = ""
@@ -39,7 +37,7 @@ def render_enum(topic: Topic) -> str:
         s_doc = render_docstring(member_docstring) + "\n" if member_docstring != "" else ""
         output += f"{name.ljust(max_name_width)} = {value}\n{s_doc}"
 
-    s_href = render_hrefs(topic.own_hrefs, True)
+    s_href = utils.render_hrefs(topic.own_hrefs, True)
 
     if topic.own_name != ENUM_UNNAMED:
         s_doc = render_docstring(topic.docstring) + "\n" if topic.docstring != "" else ""

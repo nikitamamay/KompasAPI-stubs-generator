@@ -162,8 +162,13 @@ def parse_class(cls_: type) -> PythonClass:
     py_class = PythonClass()
     py_class.name = cls_.__name__
 
-    if cls_.__base__ is not None and cls_.__base__.__name__ == "DispatchBaseClass":
-        py_class.base_classes.append(CLASS_NAME_IDispatch)
+    if cls_.__base__ is not None:
+        if cls_.__base__ == object:
+            pass  # значит, класс не_наследуется от каких-то других классов
+        elif cls_.__base__.__name__ == "DispatchBaseClass":
+            py_class.base_classes.append(CLASS_NAME_IDispatch)
+        else:
+            logger.warning(f"parse_class(): Неизвестный родительский класс: {repr(cls_.__base__.__name__)} у '{py_class.name}'")
 
     cls_vars = vars(cls_)
     properties: dict[str, PythonProperty] = {}
