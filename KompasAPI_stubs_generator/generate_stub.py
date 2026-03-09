@@ -26,6 +26,14 @@ from .classes import HelpPageType, Topic, TOCEntry, \
 from .classes import sort_py_entries
 
 
+MODULE_KAPI7_DOC = utils.render_docstring("""
+Интерфейсы Компас API версии 7.
+""", True)
+
+MODULE_K6API5_DOC = utils.render_docstring("""
+Интерфейсы Компас API версии 5.
+""", True)
+
 
 def generate_pyi_general(py_entry: PythonEntry) -> str:
     output: str = ""
@@ -161,7 +169,8 @@ def generate_pyi_class(py_entry: PythonClass) -> str:
 def generate_pyi_module(
         pylib_filepath: str,
         pyi_filepath: str,
-        recommended_order: list[str] = []
+        recommended_order: list[str] = [],
+        module_docstring: str = "",
         ) -> None:
     output: str = \
         "import typing\n" \
@@ -177,7 +186,8 @@ def generate_pyi_module(
     for py_entry in py_entries:
         output += generate_pyi_general(py_entry) + "\n"
 
-    size: int = utils.write_python_module(pyi_filepath, output)
+    size: int = utils.write_python_module(pyi_filepath, output, module_docstring)
+
 
 def main(
         do_k5: bool = True,
@@ -199,7 +209,7 @@ def main(
             )
         ]
 
-        generate_pyi_module(const.get_pylib_KAPI7_filepath_updated(), const.get_pyi_KAPI7_filepath(), classes_order)
+        generate_pyi_module(const.get_pylib_KAPI7_filepath_updated(), const.get_pyi_KAPI7_filepath(), classes_order, MODULE_KAPI7_DOC)
 
     if do_k5:
         root_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api5_root_topic_href, root_toc_entries)
@@ -214,7 +224,7 @@ def main(
             )
         ]
 
-        generate_pyi_module(const.get_pylib_K6API5_filepath_updated(), const.get_pyi_K6API5_filepath(), classes_order)
+        generate_pyi_module(const.get_pylib_K6API5_filepath_updated(), const.get_pyi_K6API5_filepath(), classes_order, MODULE_K6API5_DOC)
 
 
 

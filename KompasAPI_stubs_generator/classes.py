@@ -14,7 +14,7 @@ DO_USE_LOWERCASE_NAMES: bool = True
 ANY_TYPE_NAME = "ANY_TYPE"
 ENUM_UNNAMED = "ENUM_UNNAMED"
 
-CLASS_NAME_IDispatch = "IDispatch"
+CLASS_NAME_IDISPATCH = "IDispatch"
 
 
 class HelpPageType:

@@ -29,7 +29,7 @@ from . import parse_module
 from . import classes
 from .classes import HelpPageType, Topic, TOCEntry, \
     PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty
-from .classes import CLASS_NAME_IDispatch
+from .classes import CLASS_NAME_IDISPATCH
 
 
 from .utils.utils import PYTHON_TAB
@@ -37,6 +37,23 @@ from .utils.utils import PYTHON_TAB
 
 HIERARCHY_VARIABLE_NAME = "KompasAPIclassesHierarchy"
 HIERARCHY_VARIABLE_TYPE: typing.TypeAlias = dict[str, list[str]]
+HIERARCHY_DOCSTRING = utils.render_docstring("""
+Указывает информацию о **прямых** родителях для каждого класса интерфейса КомпасAPI:
+```
+{
+    "derived_class_name": ["base_class1_name", "base_class2_name", ...],
+    ...
+}
+```
+
+Как правило, в Компас API для каждого класса не более одного прямого родителя.
+""") + "\n"
+
+HIERARCHY_MODULE_DOC = utils.render_docstring("""
+Информация о наследовании классов интерфейсов Компас API друг от друга.
+""", True)
+
+CLASS_NAME_IDISPATCH_VARIABLE_NAME = "CLASS_NAME_IDISPATCH"
 
 
 
@@ -48,10 +65,11 @@ def generate_hierarchy(interfaces: typing.Iterable[PythonClass]) -> str:
     name_max_width: int = 0
     value_max_width: int = 0
 
-    hierarchy_dict: dict[str, tuple[str, str]] = {
-        CLASS_NAME_IDispatch: ("[]", ""),
-    }
+    hierarchy_dict: dict[str, tuple[str, str]]
     """ Словарь: `{ class_name: ( base_classes, s_href ), ... }` """
+    hierarchy_dict = {
+        CLASS_NAME_IDISPATCH: ("[]", ""),
+    }
 
     for py_entry in interfaces:
         if py_entry.name in hierarchy_dict:
@@ -78,7 +96,9 @@ def generate_hierarchy(interfaces: typing.Iterable[PythonClass]) -> str:
         s_classes += ","
         content += f'{PYTHON_TAB}{repr(name).ljust(name_max_width)}: {s_classes.ljust(value_max_width)}{s_href}\n'
 
-    content = f"{HIERARCHY_VARIABLE_NAME}: {str(HIERARCHY_VARIABLE_TYPE)} = {{\n{content}}}\n"
+    content = f"{HIERARCHY_VARIABLE_NAME}: {str(HIERARCHY_VARIABLE_TYPE)}\n{HIERARCHY_DOCSTRING}\n{HIERARCHY_VARIABLE_NAME} = {{\n{content}}}\n"
+
+    content = f"{CLASS_NAME_IDISPATCH_VARIABLE_NAME} = {repr(CLASS_NAME_IDISPATCH)}\n{utils.render_docstring('Имя класса, базового для всех классов интерфейсов Компас API.')}\n\n\n{content}"
 
     return content
 
@@ -96,7 +116,7 @@ def generate_and_write_hierarchy(
 
     content: str = generate_hierarchy(interfaces)
 
-    size = utils.write_python_module(KompasAPIclassesHierarchy_file, content)
+    size = utils.write_python_module(KompasAPIclassesHierarchy_file, content, HIERARCHY_MODULE_DOC)
     logger.info(f"Иерархия классов записана в '{KompasAPIclassesHierarchy_file}' ({size} bytes).")
 
 

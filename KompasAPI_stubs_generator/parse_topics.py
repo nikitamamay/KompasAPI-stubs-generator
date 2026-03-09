@@ -36,7 +36,7 @@ from .utils import long_processing_indication
 from . import classes
 from .classes import HelpPageType, DescriptionSection, Topic, TOCEntry
 from .classes import ANY_TYPE_NAME, ENUM_UNNAMED
-from .classes import CLASS_NAME_IDispatch
+from .classes import CLASS_NAME_IDISPATCH
 
 
 # ложное срабатывание на некоторых методах с текстом "NURBS-кривые" и "NURBS-поверхности"  # не_ставить re.IGNORECASE !
@@ -49,11 +49,11 @@ re_page_title_interface = re.compile(r"Интерфейс?ы?")  # (r"Интер
 
 # не забывать про `API интерфейсов. Версия 7 > Документ > Базовые интерфейсы > Интерфейс IKompasDocument > IKompasDocument - методы` для `Интерфейс IKompasDocument2D`
 # и есть еще `API интерфейсов. Версия 5 > KompasObject - Интерфейс API КОМПАС > KompasObject - методы > Сервисные функции` для `ksEnableTaskAccess` и др.
-re_breadcrumps_property_or_method_endswith = re.compile(r"([cс]войств[ао]|методы?)$", re.IGNORECASE)
-re_breadcrumps_property_or_method_extra = re.compile(r"(KompasObject - методы|ksDocument2D - методы)", )
+re_breadcrumbs_property_or_method_endswith = re.compile(r"([cс]войств[ао]|методы?)$", re.IGNORECASE)
+re_breadcrumbs_property_or_method_extra = re.compile(r"(KompasObject - методы|ksDocument2D - методы)", )
 
-re_breadcrumps_events = re.compile(r"([cс]обытия)$", re.IGNORECASE)
-re_breadcrumps_enum   = re.compile(r"(Константы API|Структуры параметров и константы)")
+re_breadcrumbs_events = re.compile(r"([cс]обытия)$", re.IGNORECASE)
+re_breadcrumbs_enum   = re.compile(r"(Константы API|Структуры параметров и константы)")
 
 re_heading_interface     = re.compile(r"Интерфейс ?\.{0,3}$")
 re_heading_example       = re.compile(r"Пример ?\.{0,3}$")
@@ -95,7 +95,7 @@ VT_TYPES = {
     # "VT_CY": ,
     # "VT_DATE": ,
     "VT_BSTR": "str",
-    "VT_DISPATCH": CLASS_NAME_IDispatch,
+    "VT_DISPATCH": CLASS_NAME_IDISPATCH,
     # "VT_ERROR": ,
     "VT_BOOL": "bool",
     "VT_VARIANT": "typing.Any",
@@ -435,6 +435,7 @@ def parse_description(
         tag_help_body: Tag,
         topic: Topic,
         do_try_parse_value_types: bool,
+        do_force_header_rendering: bool = False,
         ) -> DescriptionData:
     """
     Выполняет парсинг тела страницы
@@ -600,19 +601,15 @@ def parse_description(
         if section in sections:
             output += parse_description_section(section, sections[section], description_data, topic, do_try_parse_value_types)
 
+    # ссылка на страницу Справки с примером
+    s_example: str = ""
+    if description_data.example_href != "":
+        s_example = f"Пример в Справке: `{description_data.example_href}`\n\n"
+        output = f"{s_example}{output}"
+
     # заголовок
-    if output != "":
-        # ссылка на страницу Справки с примером
-        s_example: str = ""
-        if description_data.example_href != "":
-            s_example = f"Пример в Справке: `{description_data.example_href}`\n\n"
-
-        # # хлебные крошки
-        # s_breadcrumps: str = ""
-        # if topic.hmBreadCrumbs != "":
-        #     s_breadcrumps = f"Путь в Справке: {topic.hmBreadCrumbs}.\nФайл в Справке: `{utils.ensure_ext(topic.own_href, ".html")}`.\n\n"
-
-        output = f"## {utils.render_pretty_single_line(topic.hmTitle)}\n\n{s_example}{output}"
+    if output != "" or do_force_header_rendering:
+        output = f"## {utils.render_pretty_single_line(topic.hmTitle)}\n\n{output}"
 
     description_data.docstring = output
     pih: str|None = parser_injections.fix_parent_interface_href(own_href)
@@ -756,7 +753,7 @@ def parse_description_for_enum(body_tag: Tag, topic: Topic) -> bool:
     ### парсинг
 
     # к этому моменту из body_tag извлечены таблицы с enum members, поэтому они не попадут в docstring.
-    enum_docstring = parse_description(body_tag, topic, False).docstring
+    enum_docstring = parse_description(body_tag, topic, False, True).docstring
 
     enum_members: list[list[str]] = []
 
@@ -895,7 +892,7 @@ def parse_single_jstopic(
 
     ### парсинг html-контента объекта jstopic
     try:
-        # breadcrumps
+        # breadcrumbs
         bc_body: Tag = BeautifulSoup(jstopic.hmBreadCrumbs, "lxml")  # .find("body") - не обязательно в данном случае
         jstopic.hmBreadCrumbs, jstopic.breadcrumbs_links = parse_breadcrumbs(bc_body)
 
@@ -945,7 +942,7 @@ def parse_single_jstopic(
                     or jstopic.own_hrefs[0].endswith("_methods.js") \
                     or jstopic.own_hrefs[0].endswith("_propers.js") \
                     or jstopic.own_hrefs[0].endswith("_events.js") \
-                    or re_breadcrumps_property_or_method_endswith.search(jstopic.hmTitle):
+                    or re_breadcrumbs_property_or_method_endswith.search(jstopic.hmTitle):
                 jstopic.page_type = HelpPageType.LinkListPage
                 logger.debug(f"parse_single_jstopic(): страница со ссылками. Пропуск. {jstopic}")
                 return None
@@ -964,16 +961,16 @@ def parse_single_jstopic(
                 jstopic.page_type = HelpPageType.Interface
 
             # страница метода или свойства
-            elif re_breadcrumps_property_or_method_endswith.search(jstopic.hmBreadCrumbs) \
-                    or re_breadcrumps_property_or_method_extra.search(jstopic.hmBreadCrumbs):
+            elif re_breadcrumbs_property_or_method_endswith.search(jstopic.hmBreadCrumbs) \
+                    or re_breadcrumbs_property_or_method_extra.search(jstopic.hmBreadCrumbs):
                 jstopic.page_type = HelpPageType.PropertyOrMethod
 
             # страница перечисления (enum)
-            elif re_breadcrumps_enum.search(jstopic.hmBreadCrumbs):
+            elif re_breadcrumbs_enum.search(jstopic.hmBreadCrumbs):
                 jstopic.page_type = HelpPageType.Enum
 
             # страница события
-            elif re_breadcrumps_events.search(jstopic.hmBreadCrumbs):
+            elif re_breadcrumbs_events.search(jstopic.hmBreadCrumbs):
                 jstopic.page_type = HelpPageType.Event
 
             # страница неизвестного типа
@@ -1018,7 +1015,7 @@ def parse_single_jstopic(
             # может быть, это ложное срабатывание алгоритма определения типа страницы:
             # на самом деле страница про метод, у которого в названии есть слово "Интерфейс"
             if jstopic.parent_interface_href != "" \
-                    and re_breadcrumps_property_or_method_endswith.search(jstopic.hmBreadCrumbs):
+                    and re_breadcrumbs_property_or_method_endswith.search(jstopic.hmBreadCrumbs):
                 logger.warning(f"parse_single_jstopic(): Предупреждение: тип страницы изначально определен как интерфейс, но далее будет обработан как свойство/метод: {jstopic}")
                 jstopic.page_type = HelpPageType.PropertyOrMethod
                 # нет return, чтобы дальше шла ветка `if jstopic.page_type == HelpPageType.PropertyOrMethod``

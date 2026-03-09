@@ -25,6 +25,11 @@ from .classes import ENUM_UNNAMED
 from .utils.utils import indent, render_docstring
 
 
+CONSTANTS_MODULE_DOC = utils.render_docstring("""
+Константы и перечисления (enums) Компас API.
+""", True)
+
+
 def render_enum(topic: Topic) -> str:
     output: str = ""
 
@@ -48,7 +53,7 @@ def render_enum(topic: Topic) -> str:
     return output
 
 
-def generate_constants(jstopics: list[Topic]) -> str:
+def generate_and_write_constants(jstopics: list[Topic], filepath: str) -> None:
     enum_topics = list(filter(lambda topic: topic.page_type == HelpPageType.Enum, jstopics))
 
     logger.info(f"Генерации подлежат {len(enum_topics)} перечислений и групп констант.")
@@ -58,11 +63,7 @@ def generate_constants(jstopics: list[Topic]) -> str:
         logger.debug(f"generate_constants(): Рендеринг перечисления {topic}")
         output += render_enum(topic) + "\n"
 
-    return output
-
-
-def write_constants(filepath: str, content: str) -> None:
-    size = utils.write_python_module(filepath, content)
+    size = utils.write_python_module(filepath, output, CONSTANTS_MODULE_DOC)
     logger.info(f"Константы и перечисления записаны в '{filepath}' ({size} bytes).")
 
 
@@ -70,8 +71,7 @@ def main():
     jstopics: list[Topic] = []
     jstopics.extend(parse_topics.load_topics(const.get_topics_filepath()))
 
-    content = generate_constants(jstopics)
-    write_constants(const.get_KompasAPIconstants_file(), content)
+    generate_and_write_constants(jstopics, const.get_KompasAPIconstants_file())
 
 
 

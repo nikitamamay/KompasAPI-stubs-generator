@@ -23,7 +23,7 @@ from .utils import utils
 from . import classes
 from .classes import HelpPageType, Topic, TOCEntry, \
     PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty
-from .classes import CLASS_NAME_IDispatch
+from .classes import CLASS_NAME_IDISPATCH
 
 from . import parse_module
 from . import parse_topics
@@ -99,7 +99,7 @@ def update_pylibs_from_topics(
 
     logger.info(f"Получение перечней свойств/методов в родительских классах...")
     classes_children: dict[str, list[str]] = {
-        classes.get_py_entry_full_name(CLASS_NAME_IDispatch, None): [],
+        classes.get_py_entry_full_name(CLASS_NAME_IDISPATCH, None): [],
     }
     for name, py_class in pylib_entries.items():
         if isinstance(py_class, PythonClass):

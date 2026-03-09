@@ -13,7 +13,7 @@ from bs4 import BeautifulSoup, Tag, Comment
 from bs4.element import NavigableString, PageElement
 
 from .classes import HelpPageType, DescriptionSection
-from .classes import CLASS_NAME_IDispatch
+from .classes import CLASS_NAME_IDISPATCH
 
 
 
@@ -173,7 +173,7 @@ def fix_interface_name(text: str, own_href: str = "") -> str:
 
 def fix_class_hierarchy(own_href: str) -> list[list[str]] | None:
     if own_href == "ikompasapiobject.js":  # исключение. Иерархия вообще не показана.
-        return [[CLASS_NAME_IDispatch], []]
+        return [[CLASS_NAME_IDISPATCH], []]
 
     if own_href in (
             "ireportparam.js",  # написано IReportTable вместо IReportParam, поэтому не находит
@@ -181,7 +181,7 @@ def fix_class_hierarchy(own_href: str) -> list[list[str]] | None:
             "iframetreesmanager.js",  # интерфейс является дополнительным
             "iexternaltessellationmanager.js",  # интерфейс является дополнительным
             ):
-        return [[CLASS_NAME_IDispatch], []]
+        return [[CLASS_NAME_IDISPATCH], []]
 
     if own_href in (
             "iexternaltessellationobject.js",  # догадка судя по свойствам и методам в KompasAPI7.py

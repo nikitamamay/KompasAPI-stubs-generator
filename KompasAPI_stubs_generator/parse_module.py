@@ -43,7 +43,7 @@ from .utils import json_utils
 
 from . import classes
 from .classes import PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty
-from .classes import CLASS_NAME_IDispatch
+from .classes import CLASS_NAME_IDISPATCH
 
 from . import const
 
@@ -177,7 +177,7 @@ def parse_class(cls_: type, parent_entry: PythonEntry|None = None) -> PythonClas
         if cls_.__base__ == object:
             pass  # значит, класс не_наследуется от каких-то других классов
         elif cls_.__base__.__name__ == "DispatchBaseClass":
-            py_class.base_classes.append(CLASS_NAME_IDispatch)
+            py_class.base_classes.append(CLASS_NAME_IDISPATCH)
         else:
             logger.warning(f"parse_class(): Неизвестный родительский класс: {repr(cls_.__base__.__name__)} у '{py_class.name}'")
 

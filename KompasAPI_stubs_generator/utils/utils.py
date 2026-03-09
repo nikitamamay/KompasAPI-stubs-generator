@@ -39,11 +39,11 @@ def render_pretty_single_line(text: str) -> str:
 def escape_in_python_docstring(text: str) -> str:
     return text.strip().replace("\\", "\\\\").replace("\"\"\"", "\\\"\\\"\\\"")
 
-def render_docstring(text: str) -> str:
+def render_docstring(text: str, do_force_multiline: bool = False) -> str:
     text = escape_in_python_docstring(text.strip())
     if text == "":
         return ""
-    if "\n" in text:
+    if "\n" in text or do_force_multiline:
         return f'"""\n{text}\n"""'
     return f'""" {text} """'
 
@@ -122,19 +122,24 @@ def import_python_module_by_filepath(filepath: str):
     return module
 
 
-def write_python_module(filepath: str, content: str) -> int:
+def write_python_module(filepath: str, content: str, module_docstring: str = "") -> int:
     content = "\n".join([
         line.rstrip()
         for line in content.strip().splitlines(False)
     ])
     size: int = 0
 
+    module_docstring = module_docstring.strip()
+    if module_docstring != "":
+        module_docstring += "\n\n"
+
     with open(filepath, "w", encoding="utf-8") as f:
         size += f.write(
+            f"{module_docstring}" \
             f"#\n" \
-            f"# File '{os.path.split(os.path.abspath(filepath))[1]}'\n" \
-            f"# is generated automatically on {get_now_datetime_str()}\n" \
-            f"# by 'https://github.com/nikitamamay/KompasAPI-stubs-generator'\n" \
+            f"# Файл '{os.path.split(os.path.abspath(filepath))[1]}'\n" \
+            f"# сгенерирован автоматически {get_now_datetime_str()}\n" \
+            f"# с помощью 'https://github.com/nikitamamay/KompasAPI-stubs-generator'\n" \
             f"#\n" \
             f"\n" \
             f"\n" \
