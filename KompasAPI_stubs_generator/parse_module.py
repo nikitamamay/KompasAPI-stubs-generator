@@ -40,6 +40,7 @@ import types
 
 from .utils import utils
 from .utils import json_utils
+from .utils import statistics
 
 from . import classes
 from .classes import PythonEntry, PythonClass, PythonFunction, PythonVariable, PythonProperty
@@ -228,7 +229,8 @@ def parse_class(cls_: type, parent_entry: PythonEntry|None = None) -> PythonClas
 
 def parse_module(module: types.ModuleType) -> list[PythonEntry]:
     module_objects = vars(module)
-    logger.info(f"Загружен модуль '{module.__name__}' ({len(module_objects)} объектов) из файла '{module.__file__}'")
+    file_size: int = statistics.measure_size([module.__file__])
+    logger.info(f"Загружен модуль '{module.__name__}' ({len(module_objects)} объектов) из файла '{module.__file__}' ({statistics.render_file_size(file_size)})")
 
     contents: list[PythonEntry] = []
 
@@ -242,7 +244,7 @@ def parse_module(module: types.ModuleType) -> list[PythonEntry]:
 
         contents.append(parse_general(key, value))
 
-    logger.info(f"Извлечено {len(contents)} корневых объектов PythonEntry из модуля '{module.__file__}'")
+    logger.info(f"Извлечено {len(contents)} корневых объектов PythonEntry из модуля '{module.__name__}'")
     return contents
 
 
@@ -283,13 +285,8 @@ def get_entries(pylib_contents: list[PythonEntry]) -> dict[str, PythonEntry]:
 
 
 def write_pylib(pylib_filepath: str, contents: list[PythonEntry]) -> None:
-    json_utils.save_json(pylib_filepath, contents)
-    logger.info(f"Сохранено в '{pylib_filepath}'")
-
-
-def write_pylib_update(pylib_filepath: str, contents: list[PythonEntry]) -> None:
-    json_utils.save_json(pylib_filepath, contents)
-    logger.info(f"Сохранено в '{pylib_filepath}'")
+    size = json_utils.save_json(pylib_filepath, contents)
+    logger.info(f"Сохранено в '{pylib_filepath}' ({statistics.render_file_size(size)})")
 
 
 def load_pylib(pylib_filepath: str) -> list[PythonEntry]:

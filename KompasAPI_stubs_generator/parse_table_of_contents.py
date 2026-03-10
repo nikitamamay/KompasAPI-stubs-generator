@@ -22,6 +22,7 @@ from bs4.element import NavigableString, PageElement
 from .utils import json_utils
 from .utils import js_to_json
 from .utils import utils
+from .utils import statistics
 
 from .classes import TOCEntry
 
@@ -43,6 +44,8 @@ def read_toc_json(hmcontent_js_filepath: str) -> list[dict]:
     \\* правильнее, чем ссылки внутри `<p class="p_Z_LOC_TOC"></p>`
     в html-содержимом страниц справки.
     """
+    file_size: int = statistics.measure_size([hmcontent_js_filepath])
+    logger.info(f"Чтение JS/JSON из файла '{hmcontent_js_filepath}' ({statistics.render_file_size(file_size)})...")
 
     with open(hmcontent_js_filepath, "r", encoding="utf-8") as f:
         data = f.read()
@@ -92,8 +95,6 @@ def main() -> None:
     help_hmcontent_js_filepath: str = const.get_hmcontent_js_filepath()
     toc_filepath: str = const.get_toc_filepath()
 
-    logger.info(f"Чтение JS/JSON из файла '{help_hmcontent_js_filepath}'...")
-
     toc_items_json: list[dict] = read_toc_json(help_hmcontent_js_filepath)
 
     logger.info(f"Создание объектов класса TOC_Entry...")
@@ -103,11 +104,10 @@ def main() -> None:
     for toc_dict in toc_items_json:
         items.append(parse_toc_entry(toc_dict))
 
-    logger.info(f"Сохранение объектов в '{toc_filepath}'...")
+    # logger.info(f"Сохранение объектов в '{toc_filepath}'...")
 
-    json_utils.save_json(toc_filepath, items)
-
-    logger.info(f"Сохранено в '{toc_filepath}'.")
+    json_size: int = json_utils.save_json(toc_filepath, items)
+    logger.info(f"Сохранено в '{toc_filepath}' ({statistics.render_file_size(json_size)}).")
 
 
 def load_root_toc_entries(

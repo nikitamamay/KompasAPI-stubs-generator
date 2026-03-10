@@ -30,6 +30,7 @@ from . import parse_table_of_contents
 from .utils import json_utils
 from .utils import js_to_json
 from .utils import utils
+from .utils import statistics
 from .utils.utils import render_pretty_single_line
 from .utils import long_processing_indication
 
@@ -1168,7 +1169,7 @@ def fix_jstopics_after_parsing(jstopics: list[Topic]) -> None:
     Метод должен вызываться после того, как выполнен парсинг для всех страниц
     Справки: `Kompas6API5`, `KompasAPI7`, `constants`.
     """
-    logger.info(f"Исправление объектов jstopic после окончательного парсинга...")
+    logger.info(f"\nИсправление объектов jstopic после окончательного парсинга...")
 
     ### назначение имен родительских интерфейсов (parent_interface_name) для страниц свойств/методов
     # и попытка поиска родительского интерфейса через breadcrumbs_links
@@ -1290,9 +1291,17 @@ def load_topics(filepath: str) -> list[Topic]:
     return l
 
 
-def get_jstopics_filepaths(toc_entry: TOCEntry) -> list[str]:
+def get_jstopics_filepaths(toc_entry: TOCEntry) -> list[tuple[str, str]]:
+    """
+    Возвращает список `[ ( html_filepath, jstopics_js_filepath ), ... ]`, где
+    * `html_filepath` - путь к html-файлу в корневой папке Справки SDK: `sdk_help_dir/*.html`;
+    * `jstopics_js_filepath` - путь к js-файлу: `sdk_help_dir/jstopics/*.js`;
+    """
     return [
-        os.path.join(const.get_jstopics_dir(), utils.ensure_ext(toc_entry.href, ".js"))
+        (
+            os.path.join(const.get_sdk_help_dir(), toc_entry.href),
+            os.path.join(const.get_jstopics_dir(), utils.ensure_ext(toc_entry.href, ".js")),
+        )
         for toc_entry in
         parse_table_of_contents.get_toc_entries_list(toc_entry)
     ]
@@ -1324,11 +1333,12 @@ def main(
         do_k5: bool = True,
         do_k7: bool = True,
         do_const: bool = True,
+        do_collect_statistics: bool = True,
         ) -> None:
 
     toc_entries: list[TOCEntry] = parse_table_of_contents.load_root_toc_entries(const.get_toc_filepath())
 
-    filepaths: list[str] = []
+    filepaths: list[tuple[str, str]] = []
 
     if do_k7:
         root_toc_entry = parse_table_of_contents.get_toc_entry_from_href(const.help_api7_root_topic_href, toc_entries, 1)
@@ -1346,12 +1356,21 @@ def main(
         filepaths.extend(get_jstopics_filepaths(root_toc_entry))
 
     jstopics: list[Topic] = []
-    jstopics.extend(parse_jstopics(filepaths))
+    jstopics.extend(parse_jstopics([fp[1] for fp in filepaths]))
 
     fix_jstopics_after_parsing(jstopics)
 
-    json_utils.save_json(const.get_topics_filepath(), jstopics)
-    logger.info(f"Записано {len(jstopics)} объектов Topic в файл '{const.get_topics_filepath()}'")
+    logger.info(f"")  # пустая строка
+    json_file_size: int = json_utils.save_json(const.get_topics_filepath(), jstopics)
+    logger.info(f"Записано {len(jstopics)} объектов Topic в файл '{const.get_topics_filepath()}' ({statistics.render_file_size(json_file_size)})")
+
+    if do_collect_statistics:
+        html_files_size: int = statistics.measure_size([fp[0] for fp in filepaths])
+        js_files_size: int = statistics.measure_size([fp[1] for fp in filepaths])
+        total_size: int = html_files_size + js_files_size
+        logger.info(f"Суммарный размер обработанных       js-файлов:   {statistics.render_file_size(js_files_size)}")
+        logger.info(f"Суммарный размер соответствующих им html-файлов: {statistics.render_file_size(html_files_size)}")
+        logger.info(f"Суммарный общий размер файлов страниц Справки:   {statistics.render_file_size(total_size)}")
 
 
 

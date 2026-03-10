@@ -135,9 +135,19 @@ except Exception as e:
 
 
 
-logger = logging_system.get_logger(__name__)
+if not do_only:
+    for key in do_only_targets:
+        do_only_targets[key] = True
+
+if not kompas_api_section_specified:
+    for key in kompas_api_section:
+        kompas_api_section[key] = True
+
 
 const.init_filepaths()
+
+# после const.init_filepaths(), так как используется auxdir, и должна быть создана папка!
+logger = logging_system.get_logger(__name__)
 
 
 ### main
@@ -152,40 +162,46 @@ from . import generate_stub
 from . import generate_constants
 
 
-do_k5 = not kompas_api_section_specified or kompas_api_section["5"]
-do_k7 = not kompas_api_section_specified or kompas_api_section["7"]
-do_const = not kompas_api_section_specified or kompas_api_section["1"]
 
-if not do_only or do_only_targets["parse_module"]:
-    logger.info(f"\nparse_module")
+
+if ("toc" in do_only_targets or "topics" in do_only_targets):
+    const.ensure_sdk_dir_is_correct()
+
+do_k5 = kompas_api_section["5"]
+do_k7 = kompas_api_section["7"]
+do_const = kompas_api_section["1"]
+
+
+if do_only_targets["parse_module"]:
+    logger.info(f"\n--- parse_module ---")
     parse_module.main(do_k5, do_k7)
 
 
-if not do_only or do_only_targets["toc"]:
-    logger.info(f"\nparse_table_of_contents")
+if do_only_targets["toc"]:
+    logger.info(f"\n--- parse_table_of_contents ---")
     parse_table_of_contents.main()
 
-if not do_only or do_only_targets["topics"]:
-    logger.info(f"\nparse_topics")
+if do_only_targets["topics"]:
+    logger.info(f"\n--- parse_topics ---")
     parse_topics.main(do_k5, do_k7, do_const)
 
 
-if not do_only or do_only_targets["update_module"]:
-    logger.info(f"\nupdate_module")
+if do_only_targets["update_module"]:
+    logger.info(f"\n--- update_module ---")
     update_module.main(do_k5, do_k7)
 
 
-if not do_only or do_only_targets["hier"]:
-    logger.info(f"\ngenerate_hierarchy")
-    generate_hierarchy.main()
-
-if not do_only or do_only_targets["stub"]:
-    logger.info(f"\ngenerate_stub")
+if do_only_targets["stub"]:
+    logger.info(f"\n--- generate_stub ---")
     generate_stub.main(do_k5, do_k7)
 
-if not do_only or do_only_targets["const"]:
+if do_only_targets["hier"]:
+    logger.info(f"\n--- generate_hierarchy ---")
+    generate_hierarchy.main()
+
+if do_only_targets["const"]:
     if do_const:
-        logger.info(f"\ngenerate_constants")
+        logger.info(f"\n--- generate_constants ---")
         generate_constants.main()
 
 

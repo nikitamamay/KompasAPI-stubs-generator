@@ -102,7 +102,15 @@ help_constants_topic_href = "bk1803360.html"
 module_KAPI7_tail = "KompasAPI7.py"
 module_K6API5_tail = "Kompas6API5.py"
 
+def get_auxdir() -> str:
+    return _AUX_DIR_PATH
 
+def get_output_dir() -> str:
+    return _OUTPUT_DIR_PATH
+
+def get_sdk_help_dir() -> str:
+    ensure_sdk_dir_is_correct()
+    return _SDK_HELP_DIR_PATH
 
 def get_hmcontent_js_filepath() -> str:
     ensure_sdk_dir_is_correct()

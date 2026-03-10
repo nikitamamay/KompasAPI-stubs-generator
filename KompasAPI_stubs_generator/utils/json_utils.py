@@ -86,15 +86,18 @@ def mix_decoders(*decoders: typing.Callable[[object], typing.Any]):
 ### ----- FILE INTERFACE -----
 
 
-def save_json(path: str, target: object):
+def save_json(path: str, target: object) -> int:
     """
     Decodes object `target` and saves its JSON to file `path`.
 
     Automatically uses `JSONable.to_json()`.
-    """
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(target, f, default=JSONable.encode, ensure_ascii=False, indent=2)
 
+    Returns written bytes count.
+    """
+    s = bytes(json.dumps(target, default=JSONable.encode, ensure_ascii=False, indent=2), encoding="utf-8")
+    with open(path, "wb") as f:
+        size = f.write(s)
+    return size
 
 def load_json(path: str, object_hook: typing.Callable[[object], typing.Any]):
     """

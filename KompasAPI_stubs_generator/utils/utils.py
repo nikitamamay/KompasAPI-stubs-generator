@@ -133,19 +133,20 @@ def write_python_module(filepath: str, content: str, module_docstring: str = "")
     if module_docstring != "":
         module_docstring += "\n\n"
 
-    with open(filepath, "w", encoding="utf-8") as f:
-        size += f.write(
-            f"{module_docstring}" \
-            f"#\n" \
-            f"# Файл '{os.path.split(os.path.abspath(filepath))[1]}'\n" \
-            f"# сгенерирован автоматически {get_now_datetime_str()}\n" \
-            f"# с помощью 'https://github.com/nikitamamay/KompasAPI-stubs-generator'\n" \
-            f"#\n" \
-            f"\n" \
-            f"\n" \
-            f"{content}\n" \
-        )
-    logger.info(f"Python-код записан в '{filepath}' ({size} bytes).")
+    s = bytes(
+        f"{module_docstring}" \
+        f"#\n" \
+        f"# Файл '{os.path.split(os.path.abspath(filepath))[1]}'\n" \
+        f"# сгенерирован автоматически {get_now_datetime_str()}\n" \
+        f"# с помощью 'https://github.com/nikitamamay/KompasAPI-stubs-generator'\n" \
+        f"#\n" \
+        f"\n" \
+        f"\n" \
+        f"{content}\n" \
+    , encoding="utf-8")
+
+    with open(filepath, "wb") as f:
+        size += f.write(s)
     return size
 
 

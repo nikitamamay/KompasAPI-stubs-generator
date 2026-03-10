@@ -13,7 +13,7 @@ import re
 
 from . import const
 
-from .utils import json_utils
+from .utils import statistics
 from .utils import utils
 from .utils.utils import PYTHON_TAB, indent, render_docstring
 
@@ -173,11 +173,11 @@ def generate_pyi_module(
         module_docstring: str = "",
         ) -> None:
     output: str = \
-        "import typing\n" \
-        "\n" \
-        "from win32com.client import DispatchBaseClass as IDispatch\n" \
-        "\n" \
-        "\n" \
+        f"import typing\n" \
+        f"\n" \
+        f"from win32com.client import DispatchBaseClass as {classes.CLASS_NAME_IDISPATCH}\n" \
+        f"\n" \
+        f"\n" \
 
     py_entries: list[PythonEntry] = parse_module.load_pylib(pylib_filepath)
 
@@ -187,6 +187,7 @@ def generate_pyi_module(
         output += generate_pyi_general(py_entry) + "\n"
 
     size: int = utils.write_python_module(pyi_filepath, output, module_docstring)
+    logger.info(f"Stub файл записан в '{pyi_filepath}' ({statistics.render_file_size(size)}).")
 
 
 def main(

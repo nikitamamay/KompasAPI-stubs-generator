@@ -15,7 +15,7 @@ import re
 from . import const
 
 from .utils import utils
-from .utils import json_utils
+from .utils import statistics
 
 from . import parse_topics
 from . import classes
@@ -64,7 +64,7 @@ def generate_and_write_constants(jstopics: list[Topic], filepath: str) -> None:
         output += render_enum(topic) + "\n"
 
     size = utils.write_python_module(filepath, output, CONSTANTS_MODULE_DOC)
-    logger.info(f"Константы и перечисления записаны в '{filepath}' ({size} bytes).")
+    logger.info(f"Константы и перечисления записаны в '{filepath}' ({statistics.render_file_size(size)}).")
 
 
 def main():

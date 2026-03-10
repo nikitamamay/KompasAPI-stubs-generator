@@ -6,16 +6,15 @@
 
 import sys
 import logging
+import os
 
+from . import const
 
 DEFAULT_LEVEL = logging.DEBUG
 
-logging.basicConfig(
-    filename='output.log',
-    encoding='utf-8',
-    format="[%(asctime)s] %(name)s: %(levelname)s: %(message)s",
-    datefmt="%Y.%m.%d %H:%M:%S",
-)
+def get_logfile_path() -> str:
+    return os.path.join(const.get_auxdir(), "output.log")
+
 
 class StdoutInfoOnlyStreamHandler(logging.StreamHandler):
     def __init__(self) -> None:
@@ -27,10 +26,17 @@ class StdoutInfoOnlyStreamHandler(logging.StreamHandler):
             return super().handle(record)
         return False
 
+
 def get_logger(
         name: str|None,
         # level: int = DEFAULT_LEVEL,
         ) -> logging.Logger:
+    logging.basicConfig(
+        filename=get_logfile_path(),
+        encoding='utf-8',
+        format="[%(asctime)s] %(name)s: %(levelname)s: %(message)s",
+        datefmt="%Y.%m.%d %H:%M:%S",
+    )
     level = DEFAULT_LEVEL
     l = logging.getLogger(name)
     l.setLevel(level)

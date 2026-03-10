@@ -21,7 +21,7 @@ import re
 from . import const
 
 from .utils import utils
-
+from .utils import statistics
 
 from . import parse_topics
 from . import parse_module
@@ -117,7 +117,7 @@ def generate_and_write_hierarchy(
     content: str = generate_hierarchy(interfaces)
 
     size = utils.write_python_module(KompasAPIclassesHierarchy_file, content, HIERARCHY_MODULE_DOC)
-    logger.info(f"Иерархия классов записана в '{KompasAPIclassesHierarchy_file}' ({size} bytes).")
+    logger.info(f"Иерархия классов записана в '{KompasAPIclassesHierarchy_file}' ({statistics.render_file_size(size)}).")
 
 
 def load_hierarchy_python(

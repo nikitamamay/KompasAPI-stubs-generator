@@ -90,9 +90,9 @@ def update_pylibs_from_topics(
     interface_topics = classes.filter_by_type_as_dict(jstopics, HelpPageType.Interface)
     enum_topics = classes.filter_by_type_as_dict(jstopics, HelpPageType.Enum)
 
-    logger.info(f"Количество объектов class_entry_topics: {len(class_entry_topics)}")
-    logger.info(f"Количество объектов   interface_topics: {len(interface_topics)}")
-    logger.info(f"Количество объектов        enum_topics: {len(enum_topics)}")
+    logger.info(f"Количество объектов  class_entry_topics: {len(class_entry_topics)}")
+    logger.info(f"Количество объектов  interface_topics:   {len(interface_topics)}")
+    logger.info(f"Количество объектов  enum_topics:        {len(enum_topics)}")
 
 
     ### получение перечней свойств и методов, которые принадлежат родительским классам
@@ -212,8 +212,7 @@ def update_pylibs_from_topics(
     for name, topic in interface_topics.items():
         logger.debug(f"update_pylibs_from_topics(): Обновление класса '{name}' для '{topic.own_name}'")
         if not name in pylib_entries:
-            # # не надо писать, потому что среди topics есть PythonEntries вообще всего подряд (и KAPI5, и KAPI7, и constants)
-            # logger.error(f"update_pylibs_from_topics(): Ошибка: не найдено имя среди pylib_entries: '{name}' у {topic}")
+            # не надо выдавать ошибку/предупреждение, потому что среди topics есть PythonEntries вообще всего подряд (и KAPI5, и KAPI7, и constants)
             continue
 
         py_class = pylib_entries[name]
@@ -235,11 +234,6 @@ def update_pylibs_from_topics(
 
     logger.info(f"Обновлены {count} классов.")
 
-    ### запись
-
-    parse_module.write_pylib_update(pylib_updated_filepath, contents)
-
-
     ### вывод перечня py_entries без документации
 
     # список формируется заново, так как выше были удалены entries (методы/свойства, принадлежащие родительским классам) у классов
@@ -251,6 +245,10 @@ def update_pylibs_from_topics(
             logger.warning(f"update_pylibs_from_topics(): Предупреждение: Объект py_entry без документации: {repr(name)} для {repr(py_entry.name)}, href='{py_entry.hrefs}'")
             undocumented_count += 1
     logger.info(f"Количество объектов py_entry без документации: {undocumented_count}")
+
+    ### запись
+
+    parse_module.write_pylib(pylib_updated_filepath, contents)
 
 
 
